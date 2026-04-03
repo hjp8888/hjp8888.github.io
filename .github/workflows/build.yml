@@ -16,6 +16,8 @@ jobs:
     steps:
       - name: 체크아웃
         uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: 파이썬 설정
         uses: actions/setup-python@v5
