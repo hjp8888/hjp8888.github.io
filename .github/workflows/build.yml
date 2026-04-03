@@ -9,6 +9,7 @@ on:
       - 'docs3/**'
       - 'docs4/**'
       - 'docs5/**'
+  workflow_dispatch:
 
 permissions:
   contents: write
