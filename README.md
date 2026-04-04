@@ -4,6 +4,33 @@
 
 ---
 
+## ⚠️ 시작 전 필수 사항
+
+**`index.html` ~ `index5.html` 파일은 반드시 먼저 레포에 있어야 해요!**
+`docs/` 폴더만 있다고 html 파일이 자동 생성되지 않아요.
+
+### 초기 세팅 순서
+```
+1. 깡통 티들리위키 html 파일 준비 (index.html ~ index5.html)
+2. 레포에 html 파일 업로드
+3. docs/ ~ docs5/ 폴더에 .md 파일 작성
+4. push → 빌드 자동 실행 → 사이트 반영
+```
+
+### html 파일 내용 초기화가 필요할 때
+```
+1. 레포에서 해당 index.html 삭제
+2. 해당 docs/ 폴더 삭제
+3. 깡통 index.html 새로 업로드
+4. docs/ 폴더에 원하는 .md 파일 작성
+5. push → 빌드 자동 실행
+```
+
+> docs/ 폴더만 삭제해도 다음 빌드 때 index.html 에 있는 티들러가
+> 다시 docs/ 로 내보내지므로 html도 함께 초기화해야 해요.
+
+---
+
 ## 📁 폴더 구조
 
 ```
@@ -15,7 +42,7 @@ username.github.io/
 ├── index5.html         ← 티들리위키 5번
 ├── build.py            ← 빌드 스크립트
 ├── .nojekyll           ← Jekyll 비활성화 (필수)
-├── backup/             ← 자동 백업 저장 (빌드할 때마다 생성, 없으면 자동 생성)
+├── backup/             ← 자동 백업 저장 (없으면 자동 생성)
 ├── docs/               → index.html 에 삽입
 ├── docs2/              → index2.html 에 삽입
 ├── docs3/              → index3.html 에 삽입
@@ -159,6 +186,7 @@ git push
 
 ## ⚠️ 주의사항
 
-- `backup/` 폴더는 빌드할 때마다 쌓이므로 주기적으로 정리 필요 (GitHub이 git 히스토리로 버전관리 해줌)
+- `backup/` 폴더는 빌드할 때마다 쌓이므로 주기적으로 정리 필요
 - 같은 `title` 의 md 파일이 여러 개 있으면 마지막으로 읽힌 파일로 덮어써짐
 - `.nojekyll` 파일이 없으면 GitHub Pages가 Jekyll로 빌드해서 오작동할 수 있음
+- `docs/` 폴더만 삭제해도 다음 빌드 때 html에서 다시 내보내지므로 초기화 시 html도 함께 교체 필요
