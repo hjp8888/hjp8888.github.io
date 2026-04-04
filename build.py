@@ -79,15 +79,12 @@ for html_file in FILES:
     if not os.path.exists(html_file):
         continue
 
-    # 기존 백업 목록 (오래된 순)
     pattern = os.path.join(BACKUP_DIR, f'*_{html_file}')
     existing = sorted(glob.glob(pattern))
 
-    # MAX_BACKUPS 초과분 삭제
     while len(existing) >= MAX_BACKUPS:
         os.remove(existing.pop(0))
 
-    # 새 백업 생성
     backup_name = f"{timestamp}_{html_file}"
     shutil.copy(html_file, os.path.join(BACKUP_DIR, backup_name))
     print(f"✓ 백업: {backup_name}")
@@ -124,11 +121,17 @@ for html_file, docs_folder in FILES.items():
         tags  = meta.get('tags', '')
         md_titles[title] = (path, body, tags)
 
-    # html 티들러 목록 수집 (마크다운 타입만)
+    # html 티들러 목록 수집 (마크다운 타입만, 태그 포함)
     html_titles = {}
     for t in tiddlers:
         if t.get('type') == 'text/markdown' and not t.get('title','').startswith('$:/'):
-            html_titles[t['title']] = t.get('text', '')
+            tags = t.get('tags', '')
+            if isinstance(tags, list):
+                tags = ' '.join(tags)  # 리스트면 공백으로 연결
+            html_titles[t['title']] = {
+                'text': t.get('text', ''),
+                'tags': tags
+            }
 
     print(f"── {html_file} ({docs_folder}) ──")
     print(f"  html 마크다운 티들러: {len(html_titles)}개")
@@ -143,12 +146,12 @@ for html_file, docs_folder in FILES.items():
         tag_str = f"[{tags}] " if tags else ""
         print(f"  {action}: {tag_str}{title}")
 
-    # html → docs (없는 티들러 md 파일로 내보내기)
-    for title, text in html_titles.items():
+    # html → docs (없는 티들러 md 파일로 내보내기, 태그 포함)
+    for title, data in html_titles.items():
         if title not in md_titles:
             safe_name = re.sub(r'[\\/*?:"<>|]', '_', title)
             out_path = os.path.join(docs_folder, f"{safe_name}.md")
-            content = f"---\ntitle: \"{title}\"\ntags: \"\"\n---\n{text}"
+            content = f"---\ntitle: \"{title}\"\ntags: \"{data['tags']}\"\n---\n{data['text']}"
             with open(out_path, 'w', encoding='utf-8') as f:
                 f.write(content)
             total_export += 1
