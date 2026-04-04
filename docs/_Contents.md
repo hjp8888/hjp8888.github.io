@@ -1,6 +1,6 @@
 ---
 title: "_Contents"
-tags: "1 2" [[1 2]] "3"
+tags: "1 2 3 [[1 2]]"
 ---
 # 🗃️ Project Archive
 
