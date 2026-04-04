@@ -9,7 +9,8 @@ FILES = {
     'index4.html': 'docs4',
     'index5.html': 'docs5',
 }
-BACKUP_DIR = 'backup'
+BACKUP_DIR  = 'backup'
+MAX_BACKUPS = 2  # 파일당 최대 백업 개수
 # ──────────────────────────────────────
 
 def get_store(html):
@@ -70,15 +71,26 @@ def upsert(json_str, title, text, tags, modified):
         new_str = ',\n' + json.dumps(new_t, ensure_ascii=False, separators=(',',':'))
         return json_str[:-1] + new_str + ']', '추가'
 
-# ── 1. 백업 ───────────────────────────
+# ── 1. 백업 (파일당 MAX_BACKUPS개 유지) ──
 os.makedirs(BACKUP_DIR, exist_ok=True)
 timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
 
 for html_file in FILES:
-    if os.path.exists(html_file):
-        backup_name = f"{timestamp}_{html_file}"
-        shutil.copy(html_file, os.path.join(BACKUP_DIR, backup_name))
-        print(f"✓ 백업: {backup_name}")
+    if not os.path.exists(html_file):
+        continue
+
+    # 기존 백업 목록 (오래된 순)
+    pattern = os.path.join(BACKUP_DIR, f'*_{html_file}')
+    existing = sorted(glob.glob(pattern))
+
+    # MAX_BACKUPS 초과분 삭제
+    while len(existing) >= MAX_BACKUPS:
+        os.remove(existing.pop(0))
+
+    # 새 백업 생성
+    backup_name = f"{timestamp}_{html_file}"
+    shutil.copy(html_file, os.path.join(BACKUP_DIR, backup_name))
+    print(f"✓ 백업: {backup_name}")
 
 print()
 
@@ -98,11 +110,11 @@ for html_file, docs_folder in FILES.items():
     tiddlers, si, ep = get_store(html)
     result_json = html[si:ep]
 
-    # ── docs의 모든 .md 파일 수집 (하위폴더 포함) ──
+    # docs의 모든 .md 파일 수집
     md_files = sorted(glob.glob(os.path.join(docs_folder, '**/*.md'), recursive=True))
 
     # md 파일에서 title 목록 수집
-    md_titles = {}  # title → (path, text, tags)
+    md_titles = {}
     for path in md_files:
         with open(path, 'r', encoding='utf-8') as f:
             raw = f.read()
@@ -112,7 +124,7 @@ for html_file, docs_folder in FILES.items():
         tags  = meta.get('tags', '')
         md_titles[title] = (path, body, tags)
 
-    # ── html 티들러 목록 수집 (마크다운 타입만) ──
+    # html 티들러 목록 수집 (마크다운 타입만)
     html_titles = {}
     for t in tiddlers:
         if t.get('type') == 'text/markdown' and not t.get('title','').startswith('$:/'):
@@ -124,17 +136,16 @@ for html_file, docs_folder in FILES.items():
 
     count = {'추가': 0, '수정': 0}
 
-    # ── docs → html (upsert) ──
+    # docs → html (upsert)
     for title, (path, body, tags) in md_titles.items():
         result_json, action = upsert(result_json, title, body, tags, now_tw())
         count[action] += 1
         tag_str = f"[{tags}] " if tags else ""
         print(f"  {action}: {tag_str}{title}")
 
-    # ── html → docs (없는 티들러 md 파일로 내보내기) ──
+    # html → docs (없는 티들러 md 파일로 내보내기)
     for title, text in html_titles.items():
         if title not in md_titles:
-            # docs 루트에 md 파일 생성
             safe_name = re.sub(r'[\\/*?:"<>|]', '_', title)
             out_path = os.path.join(docs_folder, f"{safe_name}.md")
             content = f"---\ntitle: \"{title}\"\ntags: \"\"\n---\n{text}"
@@ -143,7 +154,7 @@ for html_file, docs_folder in FILES.items():
             total_export += 1
             print(f"  내보내기: {title} → {out_path}")
 
-    # ── 검증 후 저장 ──
+    # 검증 후 저장
     json.loads(result_json)
     with open(html_file, 'w', encoding='utf-8') as f:
         f.write(html[:si] + result_json + html[ep:])
