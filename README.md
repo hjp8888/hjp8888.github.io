@@ -11,7 +11,7 @@
 
 ### 초기 세팅 순서
 ```
-1. 깡통 티들리위키 html 파일 준비 (index.html ~ index5.html)
+1. 깡통 티들리위키 html 파일 준비 (index.html ~ index5.html, can.html, can5.html)
 2. 레포에 html 파일 업로드
 3. docs/ ~ docs5/ 폴더에 .md 파일 작성
 4. push → 빌드 자동 실행 → 사이트 반영
@@ -21,7 +21,7 @@
 ```
 1. 레포에서 해당 index.html 삭제
 2. 해당 docs/ 폴더 삭제
-3. 깡통 index.html 새로 업로드
+3. can.html 또는 can5.html 을 복사해서 index.html 로 업로드
 4. docs/ 폴더에 원하는 .md 파일 작성
 5. push → 빌드 자동 실행
 ```
@@ -34,30 +34,35 @@
 ## 📁 폴더 구조
 
 ```
-username.github.io/
-├── index.html          ← 티들리위키 1번
-├── index2.html         ← 티들리위키 2번
-├── index3.html         ← 티들리위키 3번
-├── index4.html         ← 티들리위키 4번
-├── index5.html         ← 티들리위키 5번
+hjp8888.github.io/
+├── index.html          ← 티들리위키 1번 (블로그)
+├── index2.html         ← 티들리위키 2번 (블로그)
+├── index3.html         ← 티들리위키 3번 (리뷰)
+├── index4.html         ← 티들리위키 4번 (지구)
+├── index5.html         ← 티들리위키 5번 (아카이브 🔒)
+├── can.html            ← 깡통 html (초기화용 예비)
+├── can5.html           ← 깡통 html 비밀번호 버전 (초기화용 예비)
 ├── build.py            ← 빌드 스크립트
 ├── .nojekyll           ← Jekyll 비활성화 (필수)
-├── backup/             ← 자동 백업 저장 (없으면 자동 생성)
+├── backup/             ← 자동 백업 (파일당 최대 2개, 없으면 자동 생성)
 ├── docs/               → index.html 에 삽입
 ├── docs2/              → index2.html 에 삽입
 ├── docs3/              → index3.html 에 삽입
 ├── docs4/              → index4.html 에 삽입
 ├── docs5/              → index5.html 에 삽입
 │
-│   docs 폴더 구조 예시 (docs2~docs5 동일)
+│   docs 폴더 구조 예시
 │   docs/
-│   ├── 태그없는파일.md        ← 태그 없음 (루트에 바로 넣기)
+│   ├── 파일.md              ← 태그 없음 (루트에 바로 넣기)
 │   └── 하위폴더/
-│       └── 파일.md           ← 태그: 하위폴더명
+│       └── 파일.md          ← 태그: 하위폴더명
 │
-└── .github/
-    └── workflows/
-        └── build.yml   ← GitHub Actions 자동 빌드
+├── img/                ← 이미지 파일
+├── .github/
+│   └── workflows/
+│       └── build.yml   ← GitHub Actions 자동 빌드
+└── .vscode/
+    └── tasks.json      ← VSCode 로컬 빌드 단축키 (Ctrl+Shift+B)
 ```
 
 ---
@@ -78,11 +83,19 @@ tags: "태그명"
 - `title` — 티들리위키에서 보이는 제목. 생략하면 파일명이 제목이 됨
 - `tags` — 티들리위키 태그. 생략하면 태그 없음
 - 프론트매터(`---`) 자체를 생략해도 됨
-- `tags`는 "1 2" 면 `1` `2` 각각 생성
-- "[[1 2 ]]" 으로 해야 `1 2` 생성
-- "1 2 [[1 2]]" 로 하면 `1` `2` `1 2` 3개 생성
 
-이런식이면 어떻게 태그 나와
+### 태그 규칙
+
+| 작성 방식 | 결과 |
+|------|------|
+| `tags: "여행 부산"` | 태그 2개: `여행`, `부산` |
+| `tags: "[[여행 부산]]"` | 태그 1개: `여행 부산` |
+| `tags: "[[여행 부산]] 일상"` | 태그 2개: `여행 부산`, `일상` |
+
+### 구글 검색 링크 최단 형식
+```html
+<a href="//google.com/search?q=검색어+띄어쓰기" target=_blank>g</a>
+```
 
 ---
 
@@ -90,14 +103,14 @@ tags: "태그명"
 
 ```
 build.py 실행
- ├── 1. backup/ 자동 생성 (없으면) 후 타임스탬프로 5개 html 백업
+ ├── 1. backup/ 자동 생성 (없으면) 후 타임스탬프로 html 백업 (파일당 최대 2개)
  ├── 2. docs~docs5 의 모든 .md 파일 탐색 (하위폴더 포함)
  │       ├── 프론트매터 title/tags 파싱
  │       └── 해당 html에 티들러 방식으로 삽입
  │           ├── 같은 제목 티들러 있으면 → 내용 수정
  │           └── 없으면 → 새 티들러 추가
  ├── 3. html에 있는데 docs에 없는 티들러
- │       └── docs 루트에 .md 파일로 자동 생성
+ │       └── docs 루트에 .md 파일로 자동 생성 (태그 포함)
  └── 4. index~index5.html 덮어쓰기
 ```
 
@@ -105,67 +118,25 @@ build.py 실행
 
 ## 🖥️ 사용법
 
-### VSCode (설치형) 사용 시
+### VSCode Web (github.dev) — 주요 사용 방법
 
-1. 레포 클론
-```bash
-git clone https://github.com/username/username.github.io
-cd username.github.io
-```
-
-2. `docs/` 폴더에 `.md` 파일 작성
-
-3. 빌드 실행
-```bash
-python build.py
-```
-
-4. 변경사항 푸시
-```bash
-git add .
-git commit -m "글 추가"
-git push
-```
-
----
-
-### 파이썬만 설치되어 있을 때
-
-1. 파이썬 설치 확인
-```bash
-python --version
-```
-
-2. `docs/` 폴더에 `.md` 파일 작성
-
-3. 빌드 실행
-```bash
-python build.py
-```
-
-4. 변경사항 푸시
-```bash
-git add .
-git commit -m "글 추가"
-git push
-```
-
----
-
-### VSCode Web (github.dev) 사용 시
-
-터미널·파이썬 실행 불가능하므로 **GitHub Actions** 으로 자동 빌드돼요.
-
-1. `github.dev` 에서 `docs/` 폴더에 `.md` 파일 작성
-
+1. `docs/` 폴더에 `.md` 파일 작성 또는 수정
 2. 소스 컨트롤(`Ctrl+Shift+G`) → 커밋 & 푸시
+3. GitHub Actions 자동 실행 → html 업데이트 → Pages 배포
+4. `https://hjp8888.github.io` 에서 확인
 
-3. GitHub Actions 가 자동으로 `build.py` 실행 후 html 업데이트
-
-4. `https://username.github.io` 에서 확인
-
-> Actions 탭에서 빌드 진행상황 확인 가능
 > 수동 빌드: Actions → 티들리위키 빌드 → Run workflow
+
+### VSCode 설치형 (로컬)
+
+```bash
+python build.py   # 빌드
+git add .
+git commit -m "글 추가"
+git push
+```
+
+단축키: `Ctrl+Shift+B`
 
 ---
 
@@ -175,23 +146,23 @@ git push
 ```
 레포 → Settings → Pages
 → Source: Deploy from a branch
-→ Branch: main / (root)
-→ Save
+→ Branch: main / (root) → Save
 ```
 
 ### Actions 권한 설정
 ```
 레포 → Settings → Actions → General
 → Workflow permissions
-→ Read and write permissions 선택
-→ Save
+→ Read and write permissions → Save
 ```
 
 ---
 
 ## ⚠️ 주의사항
 
-- `backup/` 폴더는 빌드할 때마다 쌓이므로 주기적으로 정리 필요
-- 같은 `title` 의 md 파일이 여러 개 있으면 마지막으로 읽힌 파일로 덮어써짐
-- `.nojekyll` 파일이 없으면 GitHub Pages가 Jekyll로 빌드해서 오작동할 수 있음
-- `docs/` 폴더만 삭제해도 다음 빌드 때 html에서 다시 내보내지므로 초기화 시 html도 함께 교체 필요
+- `$:/config/AutoSave = no` 설정으로 브라우저 localStorage 자동저장 비활성화
+  - GitHub Pages에서 항상 최신 파일 표시
+  - 로컬에서 직접 수정 시 `Ctrl+S` 수동 저장 필요
+- `backup/` 은 파일당 최대 2개 유지. GitHub git 히스토리가 실질적 백업
+- 같은 `title` 의 md 파일이 여러 개면 마지막으로 읽힌 파일로 덮어써짐
+- docs/ 폴더만 삭제해도 다음 빌드 때 html에서 다시 내보내지므로 초기화 시 html도 함께 교체 필요
