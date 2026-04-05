@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Wiki Markdown Toolbox (Centered Deep Dark)</title>
+    
+    <script src="./xlsx.full.min.js"></script>
+
+    <style>
+        :root {
+            --bg-color: #1a1a1a; 
+            --card-bg: #2d2d2d; 
+            --text-color: #e0e0e0; 
+            --accent-color: #4a90e2; 
+            --nav-bg: rgba(30, 30, 30, 0.85); 
+            --subnav-bg: rgba(45, 45, 45, 0.7); 
+            --border-color: #444; 
+            --input-bg: #111; 
+            --input-text: #b5e8b0; 
+        }
+
+        body { 
+            background: radial-gradient(circle at center, #262626 0%, var(--bg-color) 100%) !important;
+            color: var(--text-color); 
+            font-family: 'Pretendard', -apple-system, sans-serif;
+            margin: 0; padding: 0;
+            display: flex; flex-direction: column; min-height: 100vh;
+            align-items: center; 
+        }
+
+        /* [메인 Navbar] 좌우 꽉 차게 & 모바일 최적화 */
+        #wiki-navbar {
+            position: fixed; top: 0; left: 0; right: 0; z-index: 99999;
+            background: var(--nav-bg); 
+            display: flex; align-items: center; justify-content: center; 
+            height: 42px; backdrop-filter: blur(10px);
+            box-shadow: 0 1px 8px rgba(0,0,0,0.2);
+            box-sizing: border-box;
+            padding: 0 4px; /* 양 끝 최소 여백 */
+        }
+        #wiki-navbar a {
+            color: rgba(255, 255, 255, 0.6); text-decoration: none; border-radius: 6px;
+            flex: 1; text-align: center; 
+            /* 6개가 들어갈 수 있도록 폰트 크기 자동 조절 */
+            font-size: clamp(9px, 3vw, 13px); 
+            padding: 6px 2px;
+            white-space: nowrap;
+            transition: background 0.15s, color 0.15s;
+            letter-spacing: -0.5px;
+        }
+        #wiki-navbar a:hover { background: rgba(255, 255, 255, 0.1); color: #fff; }
+        #wiki-navbar a.current { color: #fff; font-weight: bold; background: rgba(255,255,255,0.12); }
+
+        /* [서브 Navbar] 도구 선택 탭 */
+        #sub-navbar {
+            position: fixed; top: 42px; left: 0; right: 0; z-index: 99998;
+            background: var(--subnav-bg); display: flex; align-items: center;
+            justify-content: center; height: 40px; backdrop-filter: blur(8px);
+            border-bottom: 1px solid var(--border-color);
+        }
+        .nav-tab {
+            color: rgba(255, 255, 255, 0.5); font-size: 12px; cursor: pointer;
+            padding: 0 20px; height: 100%; display: flex; align-items: center;
+            transition: 0.2s; border-bottom: 2px solid transparent;
+        }
+        .nav-tab.active { color: var(--accent-color); border-bottom: 2px solid var(--accent-color); font-weight: bold; }
+
+        /* 레이아웃: 가운데 정렬 유지 */
+        .tool-container {
+            width: 73% !important;
+            max-width: 1400px; /* 너무 퍼지지 않게 적정선 조절 */
+            margin: 0 auto !important;     
+            padding-top: 100px; 
+            padding-bottom: 60px;
+            box-sizing: border-box;
+        }
+
+        .tool-content { display: none; width: 100%; animation: fadeIn 0.3s; }
+        .tool-content.active { display: block; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+
+        .card { 
+            background: var(--card-bg); border-radius: 16px; padding: 25px; 
+            margin-bottom: 25px; border: 1px solid #3d3d3d; 
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+            box-sizing: border-box; 
+        }
+
+        textarea { 
+            width: 100%; background: var(--input-bg); color: var(--input-text); 
+            border: 1px solid var(--border-color); border-radius: 8px; 
+            padding: 15px; font-family: 'Fira Code', monospace; 
+            resize: vertical; box-sizing: border-box; margin-top: 12px; 
+            font-size: 14px; line-height: 1.6; 
+        }
+        
+        button { 
+            background: var(--accent-color); color: white; border: none; 
+            padding: 10px 18px; border-radius: 8px; cursor: pointer; 
+            font-weight: bold; margin: 8px 8px 0 0; font-size: 12px;
+            transition: 0.2s;
+        }
+        button:hover { background: #357abd; }
+        
+        .drop-zone { 
+            border: 2px dashed var(--border-color); border-radius: 12px; 
+            padding: 40px 20px; text-align: center; cursor: pointer; 
+            transition: 0.3s; background: rgba(255,255,255,0.02);
+            color: #aaa;
+        }
+        .drop-zone:hover { border-color: var(--accent-color); background: rgba(74, 144, 226, 0.05); color: #fff; }
+
+        /* 반응형: 모바일 기기 대응 */
+        @media (max-width: 1024px) { .tool-container { width: 90% !important; } }
+        @media (max-width: 480px) {
+            .tool-container { padding-top: 110px; width: 95% !important; }
+            .card { padding: 20px; }
+            .nav-tab { padding: 0 10px; font-size: 11px; }
+        }
+    </style>
+</head>
+<body>
+
+    <nav id="wiki-navbar">
+        <a href="index.html" id="nav-1">Home</a>
+        <a href="index2.html" id="nav-2">Blog</a>
+        <a href="index3.html" id="nav-3">Review</a>
+        <a href="index4.html" id="nav-4">Earth</a>
+        <a href="index5.html" id="nav-5">Archive🔒</a>
+        <a href="tools.html" id="nav-6" class="current">Tools</a>
+    </nav>
+
+    <nav id="sub-navbar">
+        <div class="nav-tab active" onclick="showTool('excel')">마크다운 표</div>
+        <div class="nav-tab" onclick="showTool('image')">이미지(B64)</div>
+        <div class="nav-tab" onclick="showTool('regex')">텍스트 청소</div>
+    </nav>
+
+    <main class="tool-container">
+        <div id="tool-excel" class="tool-content active">
+            <div class="card">
+                <div class="drop-zone" onclick="document.getElementById('excel-input').click()">
+                    <h3 style="color:#fff; margin-top:0;">Excel ➔ Markdown Table</h3>
+                    <p style="font-size:14px;">파일을 올리면 표 형식으로 변환됩니다</p>
+                    <input type="file" id="excel-input" hidden accept=".xlsx, .xls, .csv">
+                </div>
+                <div id="excel-results"></div>
+            </div>
+        </div>
+
+        <div id="tool-image" class="tool-content">
+            <div class="card">
+                <div class="drop-zone" onclick="document.getElementById('img-input').click()">
+                    <h3 style="color:#fff; margin-top:0;">Image ➔ Markdown/Tiddly B64</h3>
+                    <p style="font-size:14px;">이미지를 텍스트 코드로 변환합니다</p>
+                    <input type="file" id="img-input" hidden accept="image/*">
+                </div>
+                <div id="img-results" style="display: none; margin-top:15px;">
+                    <p style="font-size:12px; color:#aaa;">마크다운용 코드:</p>
+                    <textarea id="img-output-md" rows="4" readonly></textarea>
+                    <button onclick="copyVal('img-output-md')">MD 복사</button>
+                    <p style="font-size:12px; color:#aaa; margin-top:20px;">티들리위키용 코드:</p>
+                    <textarea id="img-output-tw" rows="4" readonly></textarea>
+                    <button onclick="copyVal('img-output-tw')">TW 복사</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="tool-regex" class="tool-content">
+            <div class="card">
+                <h3 style="margin-top:0; color:#fff;">Text to Markdown Cleaner</h3>
+                <textarea id="regex-input" rows="8" placeholder="원본 텍스트 입력..."></textarea>
+                <div>
+                    <button onclick="cleanText('header')"># 제목 낮추기</button>
+                    <button onclick="cleanText('list')">* 리스트화</button>
+                    <button onclick="cleanText('space')">공백 라인 제거</button>
+                </div>
+                <textarea id="regex-output" rows="8" readonly placeholder="결과물..."></textarea>
+                <button onclick="copyVal('regex-output')" style="background: #27ae60;">결과 복사</button>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        function showTool(toolId) {
+            document.querySelectorAll('.tool-content').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.nav-tab').forEach(el => el.classList.remove('active'));
+            document.getElementById('tool-' + toolId).classList.add('active');
+            event.currentTarget.classList.add('active');
+        }
+
+        // Excel, Image 변환 및 텍스트 정리 로직은 동일하게 유지 (생략 가능하나 기능 보존을 위해 포함)
+        document.getElementById('excel-input').onchange = (e) => {
+            const file = e.target.files[0];
+            const reader = new FileReader();
+            reader.onload = (ev) => {
+                const workbook = XLSX.read(new Uint8Array(ev.target.result), {type: 'array'});
+                const res = document.getElementById('excel-results');
+                res.innerHTML = '';
+                workbook.SheetNames.forEach(name => {
+                    const json = XLSX.utils.sheet_to_json(workbook.Sheets[name], {header: 1});
+                    if(json.length > 0) {
+                        const clean = (v) => String(v || "").replace(/\|/g, "\\|");
+                        let md = "| " + json[0].map(clean).join(" | ") + " |\n| " + json[0].map(()=>"---").join(" | ") + " |\n" +
+                                   json.slice(1).map(row => "| " + row.map(clean).join(" | ") + " |").join("\n");
+                        const div = document.createElement('div');
+                        div.innerHTML = `<p style="margin-top:20px; font-weight:bold; color:var(--accent-color); font-size:13px;">Sheet: ${name}</p>
+                                         <textarea id="p-${name}" rows="6" readonly>${md}</textarea>
+                                         <button onclick="copyVal('p-${name}')">복사</button>`;
+                        res.appendChild(div);
+                    }
+                });
+            };
+            reader.readAsArrayBuffer(file);
+        };
+
+        document.getElementById('img-input').onchange = (e) => {
+            const file = e.target.files[0];
+            const reader = new FileReader();
+            reader.onload = (ev) => {
+                const b64 = ev.target.result;
+                document.getElementById('img-output-md').value = `![image](${b64})`;
+                document.getElementById('img-output-tw').value = `[img[${b64}]]`;
+                document.getElementById('img-results').style.display = 'block';
+            };
+            reader.readAsDataURL(file);
+        };
+
+        function cleanText(mode) {
+            let val = document.getElementById('regex-input').value;
+            if(mode === 'header') val = val.replace(/^#/gm, '##');
+            if(mode === 'list') val = val.replace(/^/gm, '* ');
+            if(mode === 'space') val = val.replace(/^\s*[\r\n]/gm, '');
+            document.getElementById('regex-output').value = val;
+        }
+
+        function copyVal(id) {
+            const val = document.getElementById(id).value;
+            navigator.clipboard.writeText(val).then(() => {
+                const btn = event.target;
+                const oldText = btn.innerText;
+                btn.innerText = "복사됨!";
+                btn.style.background = "#27ae60";
+                setTimeout(() => {
+                    btn.innerText = oldText;
+                    btn.style.background = "";
+                }, 1200);
+            });
+        }
+    </script>
+</body>
+</html>
