@@ -1,4 +1,4 @@
-import json, os, glob, re, shutil
+import json, os, glob, re, shutil, csv
 from datetime import datetime
 
 # ── 설정 ──────────────────────────────
@@ -33,137 +33,123 @@ def parse_frontmatter(text):
 def now_tw():
     return datetime.now().strftime('%Y%m%d%H%M%S') + '000'
 
-def find_tiddler_start(json_str, title):
-    for pat in ['"title":"' + title + '"',
-                '"title":' + json.dumps(title, ensure_ascii=True)]:
-        idx = json_str.find(pat)
-        if idx == -1:
-            continue
-        for i in range(idx, max(0, idx - 5000), -1):
-            if json_str[i] == '{' and json_str[i-1] in (',', '[', '\n'):
-                try:
-                    t, end = json.JSONDecoder().raw_decode(json_str[i:])
-                    if t.get('title') == title:
-                        return i, i + end
-                except:
-                    pass
-    return -1, -1
+# --- CSV 변환 함수 추가 ---
+def csv_to_json_text(path):
+    with open(path, 'r', encoding='utf-8') as f:
+        reader = csv.DictReader(f)
+        return json.dumps([row for row in reader], ensure_ascii=False, indent=2)
 
-def upsert(json_str, title, text, tags, modified):
-    start, end = find_tiddler_start(json_str, title)
-    if start != -1:
-        t, _ = json.JSONDecoder().raw_decode(json_str[start:])
-        t['text']     = text
-        t['tags']     = tags
-        t['modified'] = modified
-        t['type']     = 'text/markdown'
-        new_str = json.dumps(t, ensure_ascii=False, separators=(',',':'))
-        return json_str[:start] + new_str + json_str[end:], '수정'
-    else:
+def json_to_csv_file(json_str, path):
+    try:
+        data = json.loads(json_str)
+        if data and isinstance(data, list) and len(data) > 0:
+            with open(path, 'w', encoding='utf-8', newline='') as f:
+                writer = csv.DictWriter(f, fieldnames=data[0].keys())
+                writer.writeheader()
+                writer.writerows(data)
+    except Exception as e:
+        print(f"  CSV 변환 에러 ({path}): {e}")
+
+def upsert(json_list, title, text, tags, time_str):
+    found = False
+    action = '추가'
+    for t in json_list:
+        if t.get('title') == title:
+            if t.get('text') != text or t.get('tags') != tags:
+                t['text'] = text
+                t['tags'] = tags
+                t['modified'] = time_str
+                action = '수정'
+            else:
+                action = '유지'
+            found = True
+            break
+    if not found:
         new_t = {
-            "created":  modified,
-            "modified": modified,
-            "title":    title,
-            "tags":     tags,
-            "type":     "text/markdown",
-            "text":     text
+            'title': title,
+            'text': text,
+            'tags': tags,
+            'created': time_str,
+            'modified': time_str
         }
-        new_str = ',\n' + json.dumps(new_t, ensure_ascii=False, separators=(',',':'))
-        return json_str[:-1] + new_str + ']', '추가'
+        # CSV 데이터인 경우 티들리위키가 JSON으로 인식하도록 타입 설정
+        if "CSVData" in tags:
+            new_t['type'] = "application/json"
+        json_list.append(new_t)
+    return json_list, action
 
-# ── 1. 백업 (파일당 MAX_BACKUPS개 유지) ──
-os.makedirs(BACKUP_DIR, exist_ok=True)
-timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+# ── 메인 실행 ──────────────────────────────
+if __name__ == "__main__":
+    if not os.path.exists(BACKUP_DIR):
+        os.makedirs(BACKUP_DIR)
 
-for html_file in FILES:
-    if not os.path.exists(html_file):
-        continue
+    for html_file, docs_folder in FILES.items():
+        if not os.path.exists(html_file): continue
+        if not os.path.exists(docs_folder): os.makedirs(docs_folder)
 
-    pattern = os.path.join(BACKUP_DIR, f'*_{html_file}')
-    existing = sorted(glob.glob(pattern))
+        with open(html_file, 'r', encoding='utf-8') as f:
+            html_content = f.read()
 
-    while len(existing) >= MAX_BACKUPS:
-        os.remove(existing.pop(0))
+        tiddlers, start, end = get_store(html_content)
+        
+        # 1. 로컬 파일 스캔 (MD + CSV)
+        md_titles = {}
+        # 마크다운 스캔
+        for fpath in glob.glob(os.path.join(docs_folder, '*.md')):
+            with open(fpath, 'r', encoding='utf-8') as f:
+                meta, body = parse_frontmatter(f.read())
+                title = meta.get('title', os.path.basename(fpath).replace('.md', ''))
+                tags = meta.get('tags', '')
+                md_titles[title] = (fpath, body, tags)
+        
+        # CSV 스캔 추가
+        for fpath in glob.glob(os.path.join(docs_folder, '*.csv')):
+            title = os.path.basename(fpath).replace('.csv', '')
+            body = csv_to_json_text(fpath)
+            md_titles[title] = (fpath, body, "CSVData")
 
-    backup_name = f"{timestamp}_{html_file}"
-    shutil.copy(html_file, os.path.join(BACKUP_DIR, backup_name))
-    print(f"✓ 백업: {backup_name}")
-
-print()
-
-# ── 2. 메인 루프 ──────────────────────
-total_add = total_mod = total_export = 0
-
-for html_file, docs_folder in FILES.items():
-    if not os.path.exists(html_file):
-        print(f"⚠ {html_file} 없음, 건너뜀\n")
-        continue
-
-    os.makedirs(docs_folder, exist_ok=True)
-
-    with open(html_file, 'r', encoding='utf-8') as f:
-        html = f.read()
-
-    tiddlers, si, ep = get_store(html)
-    result_json = html[si:ep]
-
-    # docs의 모든 .md 파일 수집
-    md_files = sorted(glob.glob(os.path.join(docs_folder, '**/*.md'), recursive=True))
-
-    # md 파일에서 title 목록 수집
-    md_titles = {}
-    for path in md_files:
-        with open(path, 'r', encoding='utf-8') as f:
-            raw = f.read()
-        meta, body = parse_frontmatter(raw)
-        fname = os.path.splitext(os.path.basename(path))[0]
-        title = meta.get('title', fname)
-        tags  = meta.get('tags', '')
-        md_titles[title] = (path, body, tags)
-
-    # html 티들러 목록 수집 (마크다운 타입만, 태그 포함)
-    html_titles = {}
-    for t in tiddlers:
-        if t.get('type') == 'text/markdown' and not t.get('title','').startswith('$:/'):
+        # 2. HTML 내 티들러 스캔
+        html_titles = {}
+        for t in tiddlers:
             tags = t.get('tags', '')
-            if isinstance(tags, list):
-                tags = ' '.join(tags)  # 리스트면 공백으로 연결
-            html_titles[t['title']] = {
-                'text': t.get('text', ''),
-                'tags': tags
-            }
+            if isinstance(tags, list): tags = ' '.join(tags)
+            html_titles[t['title']] = {'text': t.get('text', ''), 'tags': tags}
 
-    print(f"── {html_file} ({docs_folder}) ──")
-    print(f"  html 마크다운 티들러: {len(html_titles)}개")
-    print(f"  docs .md 파일: {len(md_titles)}개")
+        print(f"── {html_file} ({docs_folder}) ──")
+        result_json = tiddlers
+        count = {'추가': 0, '수정': 0, '유지': 0}
 
-    count = {'추가': 0, '수정': 0}
+        # docs → html (Upsert)
+        for title, (path, body, tags) in md_titles.items():
+            result_json, action = upsert(result_json, title, body, tags, now_tw())
+            if action != '유지': count[action] += 1
 
-    # docs → html (upsert)
-    for title, (path, body, tags) in md_titles.items():
-        result_json, action = upsert(result_json, title, body, tags, now_tw())
-        count[action] += 1
-        tag_str = f"[{tags}] " if tags else ""
-        print(f"  {action}: {tag_str}{title}")
+        # html → docs (Export)
+        for title, data in html_titles.items():
+            if title not in md_titles:
+                safe_name = re.sub(r'[\\/*?:"<>|]', '_', title)
+                # CSVData 태그가 있으면 .csv로 내보내기
+                if "CSVData" in data['tags']:
+                    out_path = os.path.join(docs_folder, f"{safe_name}.csv")
+                    json_to_csv_file(data['text'], out_path)
+                    print(f"  Export CSV: {title}")
+                else:
+                    out_path = os.path.join(docs_folder, f"{safe_name}.md")
+                    content = f"---\ntitle: \"{title}\"\ntags: \"{data['tags']}\"\n---\n{data['text']}"
+                    with open(out_path, 'w', encoding='utf-8') as f:
+                        f.write(content)
+                    print(f"  Export MD: {title}")
 
-    # html → docs (없는 티들러 md 파일로 내보내기, 태그 포함)
-    for title, data in html_titles.items():
-        if title not in md_titles:
-            safe_name = re.sub(r'[\\/*?:"<>|]', '_', title)
-            out_path = os.path.join(docs_folder, f"{safe_name}.md")
-            content = f"---\ntitle: \"{title}\"\ntags: \"{data['tags']}\"\n---\n{data['text']}"
-            with open(out_path, 'w', encoding='utf-8') as f:
-                f.write(content)
-            total_export += 1
-            print(f"  내보내기: {title} → {out_path}")
-
-    # 검증 후 저장
-    json.loads(result_json)
-    with open(html_file, 'w', encoding='utf-8') as f:
-        f.write(html[:si] + result_json + html[ep:])
-
-    print(f"  → 추가 {count['추가']}개 / 수정 {count['수정']}개\n")
-    total_add += count['추가']
-    total_mod += count['수정']
-
-print(f"✓ 완료! 추가 {total_add} / 수정 {total_mod} / 내보내기 {total_export}")
+        # 파일 저장 및 백업
+        new_store_json = json.dumps(result_json, indent=None, separators=(',', ':'), ensure_ascii=False)
+        new_html = html_content[:start] + new_store_json + html_content[end:]
+        
+        # 백업 로직 (기존 유지)
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        bak_name = f"{os.path.splitext(html_file)[0]}_{timestamp}.html"
+        shutil.copy(html_file, os.path.join(BACKUP_DIR, bak_name))
+        
+        with open(html_file, 'w', encoding='utf-8') as f:
+            f.write(new_html)
+        
+        print(f"  완료 (추가:{count['추가']}, 수정:{count['수정']})")
