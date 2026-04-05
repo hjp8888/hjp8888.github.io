@@ -1,4 +1,4 @@
-import json, os, glob, re, shutil, csv
+import json, os, glob, re, shutil
 from datetime import datetime
 
 # ── 설정 ──────────────────────────────
@@ -9,14 +9,16 @@ FILES = {
     'index4.html': 'docs4',
     'index5.html': 'docs5',
 }
-BACKUP_DIR  = 'backup'
 # ──────────────────────────────────────
 
 def get_store(html):
     marker = '<script class="tiddlywiki-tiddler-store" type="application/json">['
-    si = html.index(marker) + len(marker) - 1
-    tiddlers, end = json.JSONDecoder().raw_decode(html[si:])
-    return tiddlers, si, si + end
+    try:
+        si = html.index(marker) + len(marker) - 1
+        tiddlers, end = json.JSONDecoder().raw_decode(html[si:])
+        return tiddlers, si, si + end
+    except:
+        return [], -1, -1
 
 def parse_frontmatter(text):
     match = re.match(r'^---\n(.*?)\n---\n?', text, re.DOTALL)
@@ -32,8 +34,8 @@ def parse_frontmatter(text):
 def now_tw():
     return datetime.now().strftime('%Y%m%d%H%M%S') + '000'
 
-def read_csv_safe(path):
-    """인코딩 에러를 방지하며 CSV 파일 내용을 그대로 읽음"""
+def read_file_safe(path):
+    """CSV/MD 읽기 시 인코딩 에러 방지"""
     for enc in ['utf-8-sig', 'utf-8', 'cp949']:
         try:
             with open(path, 'r', encoding=enc) as f:
@@ -42,27 +44,20 @@ def read_csv_safe(path):
             continue
     return ""
 
-def upsert(json_list, title, text, tags, time_str, tiddler_type=None):
+def upsert(json_list, title, text, tags, time_str, t_type=None):
     found = False
     for t in json_list:
         if t.get('title') == title:
             t['text'] = text
             t['tags'] = tags
             t['modified'] = time_str
-            if tiddler_type:
-                t['type'] = tiddler_type
+            if t_type: t['type'] = t_type
+            else: t.pop('type', None) # 일반 MD는 type 제거
             found = True
             break
     if not found:
-        new_t = {
-            'title': title,
-            'text': text,
-            'tags': tags,
-            'created': time_str,
-            'modified': time_str
-        }
-        if tiddler_type:
-            new_t['type'] = tiddler_type
+        new_t = {'title': title, 'text': text, 'tags': tags, 'created': time_str, 'modified': time_str}
+        if t_type: new_t['type'] = t_type
         json_list.append(new_t)
     return json_list
 
@@ -75,32 +70,50 @@ if __name__ == "__main__":
             html_content = f.read()
 
         tiddlers, start, end = get_store(html_content)
+        if start == -1: continue
         
-        # 로컬 파일 스캔
-        md_titles = {}
-        # 1. MD 파일
+        # 1. 로컬(docs) 파일 스캔 (우선순위: docs에 있으면 위키를 덮어씀)
+        local_titles = {}
+        
+        # 마크다운(.md) 스캔
         for fpath in glob.glob(os.path.join(docs_folder, '*.md')):
-            with open(fpath, 'r', encoding='utf-8') as f:
-                meta, body = parse_frontmatter(f.read())
-                title = meta.get('title', os.path.basename(fpath).replace('.md', ''))
-                tags = meta.get('tags', '')
-                md_titles[title] = (body, tags, None)
+            content = read_file_safe(fpath)
+            meta, body = parse_frontmatter(content)
+            title = meta.get('title', os.path.basename(fpath).replace('.md', ''))
+            local_titles[title] = (body, meta.get('tags', ''), None)
         
-        # 2. CSV 파일 (요청하신 대로 파일명=제목, 타입=text/csv 설정)
+        # CSV(.csv) 스캔
         for fpath in glob.glob(os.path.join(docs_folder, '*.csv')):
             title = os.path.basename(fpath).replace('.csv', '')
-            body = read_csv_safe(fpath)
-            # 'CSVData' 태그를 자동으로 부여하여 관리 용이하게 설정
-            md_titles[title] = (body, "CSVData", "text/csv")
+            body = read_file_safe(fpath)
+            # 파일명이 제목, 태그는 CSVData, 타입은 text/csv로 고정
+            local_titles[title] = (body, "CSVData", "text/csv")
 
-        print(f"── {html_file} 업데이트 중... ──")
+        # 2. 기존 HTML 내 티들러 스캔 (내보내기 용)
+        html_titles = {}
+        for t in tiddlers:
+            tags = t.get('tags', '')
+            if isinstance(tags, list): tags = ' '.join(tags)
+            html_titles[t['title']] = {
+                'text': t.get('text', ''), 
+                'tags': tags, 
+                'type': t.get('type', '')
+            }
+
+        print(f"── {html_file} 동기화 진행 중 ──")
         result_json = tiddlers
-        for title, (body, tags, t_type) in md_titles.items():
+
+        # [방향 1] docs 폴더 기준 -> HTML 업데이트 (덮어씌우기)
+        for title, (body, tags, t_type) in local_titles.items():
             result_json = upsert(result_json, title, body, tags, now_tw(), t_type)
 
-        # 저장
-        new_store_json = json.dumps(result_json, separators=(',', ':'), ensure_ascii=False)
-        new_html = html_content[:start] + new_store_json + html_content[end:]
-        
-        with open(html_file, 'w', encoding='utf-8') as f:
-            f.write(new_html)
+        # [방향 2] HTML 기준 -> docs에 없는 파일 생성 (내보내기)
+        for title, data in html_titles.items():
+            if title not in local_titles:
+                # 파일명으로 쓸 수 없는 문자 치환
+                safe_name = re.sub(r'[\\/*?:"<>|]', '_', title)
+                
+                # 타입이 text/csv이거나 태그에 CSVData가 있으면 .csv로 생성
+                if data['type'] == "text/csv" or "CSVData" in (data['tags'] or ""):
+                    out_path = os.path.join(docs_folder, f"{safe_name}.csv")
+                    with open(out_path, 'w', encoding='utf-8-sig') as f:
