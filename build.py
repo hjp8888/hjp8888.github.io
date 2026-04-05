@@ -10,7 +10,6 @@ FILES = {
     'index5.html': 'docs5',
 }
 BACKUP_DIR  = 'backup'
-MAX_BACKUPS = 2
 # ──────────────────────────────────────
 
 def get_store(html):
@@ -33,43 +32,25 @@ def parse_frontmatter(text):
 def now_tw():
     return datetime.now().strftime('%Y%m%d%H%M%S') + '000'
 
-# --- 인코딩 문제를 해결한 CSV 읽기 함수 ---
-def csv_to_json_text(path):
-    # utf-8-sig (엑셀 BOM 대응) -> utf-8 -> cp949 순서로 시도
-    encodings = ['utf-8-sig', 'utf-8', 'cp949']
-    for enc in encodings:
+def read_csv_safe(path):
+    """인코딩 에러를 방지하며 CSV 파일 내용을 그대로 읽음"""
+    for enc in ['utf-8-sig', 'utf-8', 'cp949']:
         try:
             with open(path, 'r', encoding=enc) as f:
-                reader = csv.DictReader(f)
-                data = [row for row in reader]
-                return json.dumps(data, ensure_ascii=False, indent=2)
-        except (UnicodeDecodeError, Exception):
+                return f.read()
+        except:
             continue
-    return "[]" # 실패 시 빈 리스트 반환
+    return ""
 
-def json_to_csv_file(json_str, path):
-    try:
-        data = json.loads(json_str)
-        if data and isinstance(data, list) and len(data) > 0:
-            with open(path, 'w', encoding='utf-8-sig', newline='') as f: # 엑셀 호환을 위해 utf-8-sig 사용
-                writer = csv.DictWriter(f, fieldnames=data[0].keys())
-                writer.writeheader()
-                writer.writerows(data)
-    except Exception as e:
-        print(f"  CSV Export Error ({path}): {e}")
-
-def upsert(json_list, title, text, tags, time_str):
+def upsert(json_list, title, text, tags, time_str, tiddler_type=None):
     found = False
-    action = '추가'
     for t in json_list:
         if t.get('title') == title:
-            if t.get('text') != text or t.get('tags') != tags:
-                t['text'] = text
-                t['tags'] = tags
-                t['modified'] = time_str
-                action = '수정'
-            else:
-                action = '유지'
+            t['text'] = text
+            t['tags'] = tags
+            t['modified'] = time_str
+            if tiddler_type:
+                t['type'] = tiddler_type
             found = True
             break
     if not found:
@@ -80,14 +61,12 @@ def upsert(json_list, title, text, tags, time_str):
             'created': time_str,
             'modified': time_str
         }
-        if "CSVData" in tags:
-            new_t['type'] = "application/json"
+        if tiddler_type:
+            new_t['type'] = tiddler_type
         json_list.append(new_t)
-    return json_list, action
+    return json_list
 
 if __name__ == "__main__":
-    if not os.path.exists(BACKUP_DIR): os.makedirs(BACKUP_DIR)
-
     for html_file, docs_folder in FILES.items():
         if not os.path.exists(html_file): continue
         if not os.path.exists(docs_folder): os.makedirs(docs_folder)
@@ -97,50 +76,31 @@ if __name__ == "__main__":
 
         tiddlers, start, end = get_store(html_content)
         
+        # 로컬 파일 스캔
         md_titles = {}
-        # 1. 마크다운 스캔
+        # 1. MD 파일
         for fpath in glob.glob(os.path.join(docs_folder, '*.md')):
             with open(fpath, 'r', encoding='utf-8') as f:
                 meta, body = parse_frontmatter(f.read())
                 title = meta.get('title', os.path.basename(fpath).replace('.md', ''))
                 tags = meta.get('tags', '')
-                md_titles[title] = (fpath, body, tags)
+                md_titles[title] = (body, tags, None)
         
-        # 2. CSV 스캔 (에러 방지 로직 포함)
+        # 2. CSV 파일 (요청하신 대로 파일명=제목, 타입=text/csv 설정)
         for fpath in glob.glob(os.path.join(docs_folder, '*.csv')):
             title = os.path.basename(fpath).replace('.csv', '')
-            body = csv_to_json_text(fpath)
-            md_titles[title] = (fpath, body, "CSVData")
+            body = read_csv_safe(fpath)
+            # 'CSVData' 태그를 자동으로 부여하여 관리 용이하게 설정
+            md_titles[title] = (body, "CSVData", "text/csv")
 
-        html_titles = {}
-        for t in tiddlers:
-            tags = t.get('tags', '')
-            if isinstance(tags, list): tags = ' '.join(tags)
-            html_titles[t['title']] = {'text': t.get('text', ''), 'tags': tags}
-
-        print(f"── {html_file} ──")
+        print(f"── {html_file} 업데이트 중... ──")
         result_json = tiddlers
-        
-        # docs -> html
-        for title, (path, body, tags) in md_titles.items():
-            result_json, action = upsert(result_json, title, body, tags, now_tw())
+        for title, (body, tags, t_type) in md_titles.items():
+            result_json = upsert(result_json, title, body, tags, now_tw(), t_type)
 
-        # html -> docs
-        for title, data in html_titles.items():
-            if title not in md_titles:
-                safe_name = re.sub(r'[\\/*?:"<>|]', '_', title)
-                if "CSVData" in (data['tags'] or ""):
-                    out_path = os.path.join(docs_folder, f"{safe_name}.csv")
-                    json_to_csv_file(data['text'], out_path)
-                else:
-                    out_path = os.path.join(docs_folder, f"{safe_name}.md")
-                    content = f"---\ntitle: \"{title}\"\ntags: \"{data['tags']}\"\n---\n{data['text']}"
-                    with open(out_path, 'w', encoding='utf-8') as f:
-                        f.write(content)
-
+        # 저장
         new_store_json = json.dumps(result_json, separators=(',', ':'), ensure_ascii=False)
         new_html = html_content[:start] + new_store_json + html_content[end:]
         
         with open(html_file, 'w', encoding='utf-8') as f:
             f.write(new_html)
-        print(f"  동기화 완료")
