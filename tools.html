@@ -194,6 +194,7 @@
                 <h3 style="margin-top:0; color:#fff;">Text Cleaner</h3>
                 <textarea id="regex-input" rows="8" placeholder="원본 텍스트..."></textarea>
                 <div>
+                    <button onclick="cleanText('header-up')"># 제목 높이기</button>
                     <button onclick="cleanText('header')"># 제목 낮추기</button>
                     <button onclick="cleanText('list')">* 리스트화</button>
                     <button onclick="cleanText('space')">공백 제거</button>
@@ -259,9 +260,10 @@
 
         function cleanText(mode) {
             let val = document.getElementById('regex-input').value;
-            if(mode === 'header') val = val.replace(/^#/gm, '##');
-            if(mode === 'list') val = val.replace(/^/gm, '* ');
-            if(mode === 'space') val = val.replace(/^\s*[\r\n]/gm, '');
+            if (mode === 'header-up') val = val.replace(/^(#{1,5})(?!#)/gm, (_, hashes) => hashes.slice(1) || '#');
+            if (mode === 'header') val = val.replace(/^#/gm, '##');
+            if (mode === 'list') val = val.replace(/^/gm, '* ');
+            if (mode === 'space') val = val.replace(/^\s*[\r\n]/gm, '');
             document.getElementById('regex-output').value = val;
         }
 
