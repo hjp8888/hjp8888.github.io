@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Excel & CSV to Markdown Converter</title>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <style>
+        :root {
+            --bg-color: #1a1a1a;
+            --card-bg: #2d2d2d;
+            --text-color: #e0e0e0;
+            --accent-color: #4a90e2;
+            --nav-bg: rgba(30,30,30,0.85);
+            --border-color: #444;
+        }
+
+        body { 
+            background-color: var(--bg-color); 
+            color: var(--text-color); 
+            font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+            margin: 0; padding: 20px; padding-top: 80px;
+            display: flex; flex-direction: column; align-items: center;
+        }
+
+        /* 내비게이션 바 */
+        #wiki-navbar {
+            position: fixed; top: 0; left: 0; right: 0; z-index: 99999;
+            background: var(--nav-bg); display: flex; align-items: center;
+            justify-content: center; height: 42px; padding: 0 4px;
+            box-shadow: 0 1px 8px rgba(0,0,0,0.2); backdrop-filter: blur(10px);
+        }
+        #wiki-navbar a {
+            color: rgba(255,255,255,0.6); text-decoration: none;
+            border-radius: 8px; transition: 0.15s;
+            flex: 1; text-align: center; font-size: 13px; padding: 5px 2px;
+        }
+        #wiki-navbar a:hover { background: rgba(255,255,255,0.1); color: #fff; }
+        #wiki-navbar a.current { color: #fff; font-weight: bold; background: rgba(255,255,255,0.08); }
+
+        /* 업로드 컨테이너 */
+        #upload-container {
+            width: 100%; max-width: 800px;
+            background: var(--card-bg);
+            border: 2px dashed var(--border-color); border-radius: 16px;
+            padding: 50px 20px; text-align: center;
+            cursor: pointer; transition: 0.3s;
+            margin-bottom: 30px;
+        }
+        #upload-container:hover { border-color: var(--accent-color); background: #353535; }
+        #upload-container svg { width: 50px; height: 50px; stroke: var(--accent-color); margin-bottom: 15px; }
+        #upload-container h3 { margin: 10px 0; font-weight: 500; }
+        #upload-container p { color: #888; font-size: 0.9rem; }
+
+        /* 결과 카드 스타일 */
+        .result-list { width: 100%; max-width: 800px; }
+        .sheet-card {
+            background: var(--card-bg); border-radius: 12px;
+            padding: 20px; margin-bottom: 25px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+            animation: fadeIn 0.4s ease-out;
+        }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        
+        .sheet-header { 
+            display: flex; justify-content: space-between; align-items: center; 
+            margin-bottom: 15px; border-bottom: 1px solid #444; padding-bottom: 10px;
+        }
+        h2 { font-size: 1rem; color: var(--accent-color); margin: 0; }
+        
+        pre {
+            background: #111; color: #b5e8b0; padding: 15px; border-radius: 8px;
+            font-family: 'Fira Code', 'Cascadia Code', monospace; font-size: 13px;
+            overflow-x: auto; white-space: pre-wrap; border: 1px solid #333;
+            line-height: 1.5;
+        }
+
+        .copy-btn {
+            background: var(--accent-color); color: #fff; border: none;
+            padding: 8px 16px; border-radius: 6px; cursor: pointer; 
+            font-size: 12px; font-weight: bold; transition: 0.2s;
+        }
+        .copy-btn:hover { filter: brightness(1.2); transform: scale(1.05); }
+
+        /* 상단 이동 버튼 */
+        #go-to-top {
+            position: fixed; bottom: 28px; right: 24px; z-index: 9999;
+            width: 44px; height: 44px; border-radius: 50%;
+            background: rgba(0,0,0,0.6); color: #fff; border: none;
+            cursor: pointer; display: none; align-items: center; justify-content: center;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.3); transition: 0.3s;
+        }
+        #go-to-top:hover { background: var(--accent-color); }
+        #go-to-top svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2.5; }
+
+        @media (max-width: 600px) {
+            #upload-container { padding: 30px 10px; }
+            #wiki-navbar a { font-size: 11px; }
+        }
+    </style>
+</head>
+<body>
+
+    <nav id="wiki-navbar">
+        <a href="index.html">Home</a>
+        <a href="index2.html">Blog</a>
+        <a href="index3.html">Review</a>
+        <a href="index4.html">Earth</a>
+        <a href="index5.html">Archive🔒</a>
+        <a href="excel.html" class="current">Excel/CSV Tool</a>
+    </nav>
+
+    <div id="upload-container" onclick="document.getElementById('fileInput').click()">
+        <svg viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width="2">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+            <polyline points="17 8 12 3 7 8"/>
+            <line x1="12" y1="3" x2="12" y2="15"/>
+        </svg>
+        <h3>파일을 드래그하거나 클릭하여 선택하세요</h3>
+        <p>지원 파일: .xlsx, .xls, .csv (UTF-8 권장)</p>
+        <input type="file" id="fileInput" hidden accept=".xlsx, .xls, .csv">
+    </div>
+
+    <div id="result-list" class="result-list"></div>
+
+    <button id="go-to-top" aria-label="Go to top">
+        <svg viewBox="0 0 24 24"><polyline points="18 15 12 9 6 15"/></svg>
+    </button>
+
+    <script>
+        const fileInput = document.getElementById('fileInput');
+        const uploadContainer = document.getElementById('upload-container');
+        const resultList = document.getElementById('result-list');
+
+        // 드래그 앤 드랍 핸들러
+        uploadContainer.ondragover = (e) => { e.preventDefault(); uploadContainer.style.borderColor = "#4a90e2"; };
+        uploadContainer.ondragleave = () => { uploadContainer.style.borderColor = "#444"; };
+        uploadContainer.ondrop = (e) => {
+            e.preventDefault();
+            uploadContainer.style.borderColor = "#444";
+            handleFiles(e.dataTransfer.files);
+        };
+
+        fileInput.onchange = (e) => handleFiles(e.target.files);
+
+        function handleFiles(files) {
+            const file = files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            const fileName = file.name;
+            const isCsv = fileName.toLowerCase().endsWith('.csv');
+
+            reader.onload = (e) => {
+                try {
+                    let workbook;
+                    if (isCsv) {
+                        const decoder = new TextDecoder('utf-8');
+                        const text = decoder.decode(e.target.result);
+                        workbook = XLSX.read(text, { type: 'string' });
+                    } else {
+                        const data = new Uint8Array(e.target.result);
+                        workbook = XLSX.read(data, { type: 'array' });
+                    }
+
+                    resultList.innerHTML = ''; // 화면 초기화
+
+                    workbook.SheetNames.forEach(sheetName => {
+                        const sheet = workbook.Sheets[sheetName];
+                        // 엑셀 데이터를 2차원 배열로 변환
+                        const json = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+                        
+                        if (json.length > 0) {
+                            const md = convertToMarkdown(json);
+                            createCard(`${fileName} - [${sheetName}]`, md);
+                        }
+                    });
+                } catch (err) {
+                    alert("파일을 읽는 중 오류가 발생했습니다: " + err.message);
+                }
+            };
+
+            reader.readAsArrayBuffer(file);
+        }
+
+        // JSON 데이터를 마크다운 표 형식으로 변환하는 핵심 함수
+        function convertToMarkdown(data) {
+            if (!data || data.length === 0) return "";
+            
+            // 파이프(|) 기호가 데이터 내에 있을 경우 이스케이프 처리
+            const clean = (val) => String(val === null || val === undefined ? "" : val).replace(/\|/g, "\\|");
+
+            // 1. 헤더 행
+            let md = "| " + data[0].map(clean).join(" | ") + " |\n";
+            
+            // 2. 구분선 (---)
+            md += "| " + data[0].map(() => "---").join(" | ") + " |\n";
+            
+            // 3. 데이터 행
+            for (let i = 1; i < data.length; i++) {
+                // 빈 행은 건너뜀
+                if (data[i].length === 0 || (data[i].length === 1 && !data[i][0])) continue;
+                md += "| " + data[i].map(clean).join(" | ") + " |\n";
+            }
+            return md;
+        }
+
+        // 결과 카드 생성 및 화면 표시
+        function createCard(title, content) {
+            const card = document.createElement('div');
+            card.className = 'sheet-card';
+            const uniqueId = 'md-' + Math.random().toString(36).substr(2, 9);
+            
+            card.innerHTML = `
+                <div class="sheet-header">
+                    <h2>📄 ${title}</h2>
+                    <button class="copy-btn" onclick="copyToClipboard('${uniqueId}')">마크다운 복사</button>
+                </div>
+                <pre id="${uniqueId}">${content}</pre>
+            `;
+            resultList.appendChild(card);
+        }
+
+        // 클립보드 복사 함수
+        function copyToClipboard(id) {
+            const text = document.getElementById(id).innerText;
+            navigator.clipboard.writeText(text).then(() => {
+                const btn = document.querySelector(`button[onclick="copyToClipboard('${id}')"]`);
+                const originalText = btn.innerText;
+                btn.innerText = "복사 완료!";
+                btn.style.background = "#28a745";
+                setTimeout(() => {
+                    btn.innerText = originalText;
+                    btn.style.background = "";
+                }, 1500);
+            });
+        }
+
+        // 상단 이동 버튼 로직
+        const topBtn = document.getElementById('go-to-top');
+        window.onscroll = () => {
+            topBtn.style.display = window.scrollY > 300 ? 'flex' : 'none';
+        };
+        topBtn.onclick = () => window.scrollTo({ top: 0, behavior: 'smooth' });
+    </script>
+</body>
+</html>
