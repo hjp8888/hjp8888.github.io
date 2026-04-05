@@ -1,11 +1,13 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
+    <script src="./xlsx.full.min.js"></script>
+    <script src="./marked.min.js"></script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Wiki Markdown Toolbox (Centered Deep Dark)</title>
+    <title>Wiki Multi-Toolbox (Final v2)</title>
     
-    <script src="./xlsx.full.min.js"></script>
+    
 
     <style>
         :root {
@@ -14,10 +16,12 @@
             --text-color: #e0e0e0; 
             --accent-color: #4a90e2; 
             --nav-bg: rgba(30, 30, 30, 0.85); 
-            --subnav-bg: rgba(45, 45, 45, 0.7); 
+            --subnav-bg: rgba(45, 45, 45, 0.9); 
             --border-color: #444; 
             --input-bg: #111; 
             --input-text: #b5e8b0; 
+            --success-color: #2ecc71;
+            --warning-color: #f39c12;
         }
 
         body { 
@@ -29,50 +33,46 @@
             align-items: center; 
         }
 
-        /* [메인 Navbar] 좌우 꽉 차게 & 모바일 최적화 */
+        /* [메인 Navbar] */
         #wiki-navbar {
             position: fixed; top: 0; left: 0; right: 0; z-index: 99999;
-            background: var(--nav-bg); 
-            display: flex; align-items: center; justify-content: center; 
-            height: 42px; backdrop-filter: blur(10px);
-            box-shadow: 0 1px 8px rgba(0,0,0,0.2);
-            box-sizing: border-box;
-            padding: 0 4px; /* 양 끝 최소 여백 */
+            background: var(--nav-bg); display: flex; align-items: center; justify-content: center; 
+            height: 42px; backdrop-filter: blur(10px); box-shadow: 0 1px 8px rgba(0,0,0,0.2);
+            box-sizing: border-box; padding: 0 4px;
         }
         #wiki-navbar a {
             color: rgba(255, 255, 255, 0.6); text-decoration: none; border-radius: 6px;
-            flex: 1; text-align: center; 
-            /* 6개가 들어갈 수 있도록 폰트 크기 자동 조절 */
-            font-size: clamp(9px, 3vw, 13px); 
-            padding: 6px 2px;
-            white-space: nowrap;
-            transition: background 0.15s, color 0.15s;
-            letter-spacing: -0.5px;
+            flex: 1; text-align: center; font-size: clamp(9px, 3vw, 13px); padding: 6px 2px;
+            white-space: nowrap; transition: 0.15s;
         }
         #wiki-navbar a:hover { background: rgba(255, 255, 255, 0.1); color: #fff; }
         #wiki-navbar a.current { color: #fff; font-weight: bold; background: rgba(255,255,255,0.12); }
 
-        /* [서브 Navbar] 도구 선택 탭 */
+        /* [서브 Navbar] */
         #sub-navbar {
             position: fixed; top: 42px; left: 0; right: 0; z-index: 99998;
             background: var(--subnav-bg); display: flex; align-items: center;
-            justify-content: center; height: 40px; backdrop-filter: blur(8px);
+            justify-content: center; height: 44px; backdrop-filter: blur(8px);
             border-bottom: 1px solid var(--border-color);
+            overflow-x: auto; overflow-y: hidden; -webkit-overflow-scrolling: touch;
+            padding: 0 15px; box-sizing: border-box;
         }
+        @media (max-width: 768px) { #sub-navbar { justify-content: flex-start; } }
+        #sub-navbar::-webkit-scrollbar { display: none; }
+        #sub-navbar { -ms-overflow-style: none; scrollbar-width: none; }
+
         .nav-tab {
-            color: rgba(255, 255, 255, 0.5); font-size: 12px; cursor: pointer;
-            padding: 0 20px; height: 100%; display: flex; align-items: center;
-            transition: 0.2s; border-bottom: 2px solid transparent;
+            color: rgba(255, 255, 255, 0.5); font-size: 11px; cursor: pointer;
+            padding: 0 15px; height: 100%; display: flex; align-items: center;
+            transition: 0.2s; border-bottom: 2px solid transparent; flex-shrink: 0;
+            white-space: nowrap;
         }
         .nav-tab.active { color: var(--accent-color); border-bottom: 2px solid var(--accent-color); font-weight: bold; }
 
-        /* 레이아웃: 가운데 정렬 유지 */
+        /* 레이아웃 */
         .tool-container {
-            width: 73% !important;
-            max-width: 1400px; /* 너무 퍼지지 않게 적정선 조절 */
-            margin: 0 auto !important;     
-            padding-top: 100px; 
-            padding-bottom: 60px;
+            width: 73% !important; max-width: 1400px;
+            margin: 0 auto !important; padding-top: 115px; padding-bottom: 60px;
             box-sizing: border-box;
         }
 
@@ -84,57 +84,68 @@
             background: var(--card-bg); border-radius: 16px; padding: 25px; 
             margin-bottom: 25px; border: 1px solid #3d3d3d; 
             box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
-            box-sizing: border-box; 
         }
 
         textarea { 
             width: 100%; background: var(--input-bg); color: var(--input-text); 
             border: 1px solid var(--border-color); border-radius: 8px; 
-            padding: 15px; font-family: 'Fira Code', monospace; 
-            resize: vertical; box-sizing: border-box; margin-top: 12px; 
-            font-size: 14px; line-height: 1.6; 
+            padding: 12px; font-family: 'Fira Code', monospace; 
+            resize: vertical; box-sizing: border-box; margin-top: 10px; 
+            font-size: 13px; line-height: 1.6; 
         }
         
         button { 
             background: var(--accent-color); color: white; border: none; 
             padding: 10px 18px; border-radius: 8px; cursor: pointer; 
-            font-weight: bold; margin: 8px 8px 0 0; font-size: 12px;
-            transition: 0.2s;
+            font-weight: bold; margin: 8px 8px 0 0; font-size: 11px; transition: 0.2s;
         }
-        button:hover { background: #357abd; }
-        
+        button:hover { opacity: 0.8; }
+
         .drop-zone { 
             border: 2px dashed var(--border-color); border-radius: 12px; 
-            padding: 40px 20px; text-align: center; cursor: pointer; 
-            transition: 0.3s; background: rgba(255,255,255,0.02);
-            color: #aaa;
+            padding: 30px 20px; text-align: center; cursor: pointer; 
+            transition: 0.3s; background: rgba(255,255,255,0.02); color: #aaa;
         }
-        .drop-zone:hover { border-color: var(--accent-color); background: rgba(74, 144, 226, 0.05); color: #fff; }
 
-        /* 반응형: 모바일 기기 대응 */
+        .preview-area {
+            margin-top: 20px; padding: 20px; background: #fff; color: #333; 
+            border-radius: 8px; min-height: 150px; overflow: auto;
+            font-size: 14px; line-height: 1.6;
+        }
+        /* 마크다운 내부 표 스타일 */
+        .preview-area table { border-collapse: collapse; width: 100%; margin-bottom: 1em; }
+        .preview-area th, .preview-area td { border: 1px solid #ddd; padding: 8px; }
+        .preview-area th { background-color: #f5f5f5; }
+        .preview-area img { max-width: 100%; height: auto; }
+
+        .label-desc { font-size: 12px; color: var(--accent-color); font-weight: bold; margin-top: 15px; display: block; }
+        .sub-desc { font-size: 11px; color: #888; margin-bottom: 5px; }
+
         @media (max-width: 1024px) { .tool-container { width: 90% !important; } }
         @media (max-width: 480px) {
-            .tool-container { padding-top: 110px; width: 95% !important; }
-            .card { padding: 20px; }
-            .nav-tab { padding: 0 10px; font-size: 11px; }
+            .tool-container { padding-top: 125px; width: 95% !important; }
+            .card { padding: 18px; }
         }
     </style>
 </head>
 <body>
 
     <nav id="wiki-navbar">
-        <a href="index.html" id="nav-1">Home</a>
-        <a href="index2.html" id="nav-2">Blog</a>
-        <a href="index3.html" id="nav-3">Review</a>
-        <a href="index4.html" id="nav-4">Earth</a>
-        <a href="index5.html" id="nav-5">Archive🔒</a>
-        <a href="tools.html" id="nav-6" class="current">Tools</a>
+        <a href="index.html">Home</a>
+        <a href="index2.html">Blog</a>
+        <a href="index3.html">Review</a>
+        <a href="index4.html">Earth</a>
+        <a href="index5.html">Archive🔒</a>
+        <a href="tools.html" class="current">Tools</a>
     </nav>
 
     <nav id="sub-navbar">
         <div class="nav-tab active" onclick="showTool('excel')">마크다운 표</div>
-        <div class="nav-tab" onclick="showTool('image')">이미지(B64)</div>
+        <div class="nav-tab" onclick="showTool('image')">이미지 변환</div>
         <div class="nav-tab" onclick="showTool('regex')">텍스트 청소</div>
+        <div class="nav-tab" onclick="showTool('counter')">글자수 분석</div>
+        <div class="nav-tab" onclick="showTool('html')">HTML 프리뷰</div>
+        <div class="nav-tab" onclick="showTool('md-preview')">마크다운 프리뷰</div>
     </nav>
 
     <main class="tool-container">
@@ -142,7 +153,7 @@
             <div class="card">
                 <div class="drop-zone" onclick="document.getElementById('excel-input').click()">
                     <h3 style="color:#fff; margin-top:0;">Excel ➔ Markdown Table</h3>
-                    <p style="font-size:14px;">파일을 올리면 표 형식으로 변환됩니다</p>
+                    <p style="font-size:13px;">파일을 올리면 표 형식으로 변환됩니다</p>
                     <input type="file" id="excel-input" hidden accept=".xlsx, .xls, .csv">
                 </div>
                 <div id="excel-results"></div>
@@ -152,32 +163,71 @@
         <div id="tool-image" class="tool-content">
             <div class="card">
                 <div class="drop-zone" onclick="document.getElementById('img-input').click()">
-                    <h3 style="color:#fff; margin-top:0;">Image ➔ Markdown/Tiddly B64</h3>
-                    <p style="font-size:14px;">이미지를 텍스트 코드로 변환합니다</p>
+                    <h3 style="color:#fff; margin-top:0;">Image ➔ Markdown Optimizer</h3>
+                    <p style="font-size:13px;">이미지를 마크다운 코드로 변환합니다 (참조식 지원)</p>
                     <input type="file" id="img-input" hidden accept="image/*">
                 </div>
-                <div id="img-results" style="display: none; margin-top:15px;">
-                    <p style="font-size:12px; color:#aaa;">마크다운용 코드:</p>
-                    <textarea id="img-output-md" rows="4" readonly></textarea>
-                    <button onclick="copyVal('img-output-md')">MD 복사</button>
-                    <p style="font-size:12px; color:#aaa; margin-top:20px;">티들리위키용 코드:</p>
-                    <textarea id="img-output-tw" rows="4" readonly></textarea>
-                    <button onclick="copyVal('img-output-tw')">TW 복사</button>
+                <div id="img-results" style="display: none;">
+                    <label class="label-desc">방법 A: 일반 인라인 방식</label>
+                    <textarea id="img-output-inline" rows="2" readonly></textarea>
+                    <button onclick="copyVal('img-output-inline')">복사</button>
+                    <hr style="border:0; border-top:1px solid #444; margin:20px 0;">
+                    <label class="label-desc" style="color:var(--warning-color)">방법 B: 참조식 마크다운 (권장)</label>
+                    <div style="display: flex; gap: 8px; align-items: flex-end;">
+                        <div style="flex:1">
+                            <p class="sub-desc">① 본문 삽입용</p>
+                            <textarea id="img-output-ref-top" rows="1" readonly style="color:var(--accent-color);"></textarea>
+                        </div>
+                        <button onclick="copyVal('img-output-ref-top')" style="margin-bottom:5px;">복사</button>
+                    </div>
+                    <div style="margin-top:10px;">
+                        <p class="sub-desc">② 문서 하단 정의용 (긴 데이터)</p>
+                        <textarea id="img-output-ref-bottom" rows="3" readonly style="font-size:11px;"></textarea>
+                        <button onclick="copyVal('img-output-ref-bottom')" style="background:var(--success-color); width:100%; margin-top:8px;">하단 데이터 전체 복사</button>
+                    </div>
                 </div>
             </div>
         </div>
 
         <div id="tool-regex" class="tool-content">
             <div class="card">
-                <h3 style="margin-top:0; color:#fff;">Text to Markdown Cleaner</h3>
-                <textarea id="regex-input" rows="8" placeholder="원본 텍스트 입력..."></textarea>
+                <h3 style="margin-top:0; color:#fff;">Text Cleaner</h3>
+                <textarea id="regex-input" rows="8" placeholder="원본 텍스트..."></textarea>
                 <div>
                     <button onclick="cleanText('header')"># 제목 낮추기</button>
                     <button onclick="cleanText('list')">* 리스트화</button>
-                    <button onclick="cleanText('space')">공백 라인 제거</button>
+                    <button onclick="cleanText('space')">공백 제거</button>
                 </div>
-                <textarea id="regex-output" rows="8" readonly placeholder="결과물..."></textarea>
-                <button onclick="copyVal('regex-output')" style="background: #27ae60;">결과 복사</button>
+                <textarea id="regex-output" rows="8" readonly></textarea>
+                <button onclick="copyVal('regex-output')" style="background: var(--success-color);">결과 복사</button>
+            </div>
+        </div>
+
+        <div id="tool-counter" class="tool-content">
+            <div class="card">
+                <h3 style="color:#fff; margin:0;">Content Analyzer</h3>
+                <textarea id="counter-input" rows="10" oninput="analyzeText()"></textarea>
+                <div class="stat-grid">
+                    <div class="stat-item"><span id="stat-char">0</span><label>공백포함</label></div>
+                    <div class="stat-item"><span id="stat-no-space">0</span><label>공백제외</label></div>
+                    <div class="stat-item"><span id="stat-word">0</span><label>단어수</label></div>
+                </div>
+            </div>
+        </div>
+
+        <div id="tool-html" class="tool-content">
+            <div class="card">
+                <h3 style="color:#fff; margin:0;">HTML Live Preview</h3>
+                <textarea id="html-preview-input" rows="8" placeholder="HTML 코드를 입력하세요..." oninput="renderHTML()"></textarea>
+                <div id="html-display-area" class="preview-area"></div>
+            </div>
+        </div>
+
+        <div id="tool-md-preview" class="tool-content">
+            <div class="card">
+                <h3 style="color:#fff; margin:0;">Markdown Live Preview</h3>
+                <textarea id="md-preview-input" rows="10" placeholder="마크다운 문법으로 작성하세요..." oninput="renderMD()"></textarea>
+                <div id="md-display-area" class="preview-area"></div>
             </div>
         </div>
     </main>
@@ -190,7 +240,46 @@
             event.currentTarget.classList.add('active');
         }
 
-        // Excel, Image 변환 및 텍스트 정리 로직은 동일하게 유지 (생략 가능하나 기능 보존을 위해 포함)
+        // 프리뷰 로직
+        function renderHTML() {
+            document.getElementById('html-display-area').innerHTML = document.getElementById('html-preview-input').value;
+        }
+
+        function renderMD() {
+            const input = document.getElementById('md-preview-input').value;
+            document.getElementById('md-display-area').innerHTML = marked.parse(input);
+        }
+
+        function analyzeText() {
+            const val = document.getElementById('counter-input').value;
+            document.getElementById('stat-char').innerText = val.length;
+            document.getElementById('stat-no-space').innerText = val.replace(/\s/g, '').length;
+            document.getElementById('stat-word').innerText = val.trim() === "" ? 0 : val.trim().split(/\s+/).length;
+        }
+
+        function cleanText(mode) {
+            let val = document.getElementById('regex-input').value;
+            if(mode === 'header') val = val.replace(/^#/gm, '##');
+            if(mode === 'list') val = val.replace(/^/gm, '* ');
+            if(mode === 'space') val = val.replace(/^\s*[\r\n]/gm, '');
+            document.getElementById('regex-output').value = val;
+        }
+
+        document.getElementById('img-input').onchange = (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (ev) => {
+                const b64 = ev.target.result;
+                const label = `img_${Math.random().toString(36).substr(2, 5)}`;
+                document.getElementById('img-output-inline').value = `![${file.name}](${b64})`;
+                document.getElementById('img-output-ref-top').value = `![${file.name}][${label}]`;
+                document.getElementById('img-output-ref-bottom').value = `[${label}]: ${b64}`;
+                document.getElementById('img-results').style.display = 'block';
+            };
+            reader.readAsDataURL(file);
+        };
+
         document.getElementById('excel-input').onchange = (e) => {
             const file = e.target.files[0];
             const reader = new FileReader();
@@ -205,8 +294,8 @@
                         let md = "| " + json[0].map(clean).join(" | ") + " |\n| " + json[0].map(()=>"---").join(" | ") + " |\n" +
                                    json.slice(1).map(row => "| " + row.map(clean).join(" | ") + " |").join("\n");
                         const div = document.createElement('div');
-                        div.innerHTML = `<p style="margin-top:20px; font-weight:bold; color:var(--accent-color); font-size:13px;">Sheet: ${name}</p>
-                                         <textarea id="p-${name}" rows="6" readonly>${md}</textarea>
+                        div.innerHTML = `<p style="margin-top:20px; font-weight:bold; color:var(--accent-color); font-size:12px;">Sheet: ${name}</p>
+                                         <textarea id="p-${name}" rows="5" readonly>${md}</textarea>
                                          <button onclick="copyVal('p-${name}')">복사</button>`;
                         res.appendChild(div);
                     }
@@ -215,37 +304,14 @@
             reader.readAsArrayBuffer(file);
         };
 
-        document.getElementById('img-input').onchange = (e) => {
-            const file = e.target.files[0];
-            const reader = new FileReader();
-            reader.onload = (ev) => {
-                const b64 = ev.target.result;
-                document.getElementById('img-output-md').value = `![image](${b64})`;
-                document.getElementById('img-output-tw').value = `[img[${b64}]]`;
-                document.getElementById('img-results').style.display = 'block';
-            };
-            reader.readAsDataURL(file);
-        };
-
-        function cleanText(mode) {
-            let val = document.getElementById('regex-input').value;
-            if(mode === 'header') val = val.replace(/^#/gm, '##');
-            if(mode === 'list') val = val.replace(/^/gm, '* ');
-            if(mode === 'space') val = val.replace(/^\s*[\r\n]/gm, '');
-            document.getElementById('regex-output').value = val;
-        }
-
         function copyVal(id) {
             const val = document.getElementById(id).value;
             navigator.clipboard.writeText(val).then(() => {
                 const btn = event.target;
                 const oldText = btn.innerText;
                 btn.innerText = "복사됨!";
-                btn.style.background = "#27ae60";
-                setTimeout(() => {
-                    btn.innerText = oldText;
-                    btn.style.background = "";
-                }, 1200);
+                btn.style.background = "var(--success-color)";
+                setTimeout(() => { btn.innerText = oldText; btn.style.background = ""; }, 1200);
             });
         }
     </script>
