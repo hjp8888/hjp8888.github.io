@@ -277,8 +277,6 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE." />
 
 <li>_Contents</li>
 
-<li>$:/_MyCustomStyle</li>
-
 <li>$:/config/AutoSave</li>
 
 <li>$:/config/markdown/linkify</li>
@@ -377,7 +375,6 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE." />
 <!--~~ Ordinary tiddlers ~~-->
 <script class="tiddlywiki-tiddler-store" type="application/json">[
 {"created":"20260331093820168","text":"","tags":"","title":"_Contents","modified":"20260404234807639","type":"text/markdown"},
-{"created":"20260405021309789","text":"/* 1. 스토리 영역(본문): 좌측 여백 100px 확보 및 너비 73% */\n.tc-story-river {\n    width: 73% !important;\n    max-width: 2800px !important; \n    margin-left: 100px !important;  /* [수정] 왼쪽 여백을 넉넉하게 부여 */\n    margin-right: auto !important; \n    padding: 60px 0 !important;\n    float: none !important;\n    position: relative;\n    z-index: 1;\n}\n\n/* 2. 티들러 프레임: 본문 너비에 맞춰 확장 */\n.tc-tiddler-frame {\n    width: 100% !important;\n    margin-bottom: 30px !important;\n    box-sizing: border-box;\n    /* 테마 색상 유지를 위해 디자인 속성 배제 */\n}\n\n/* 3. 사이드바: 우측 끝으로 배치하여 버튼 클릭 간섭 차단 */\n.tc-sidebar-scrollable {\n    z-index: 2000 !important;\n    pointer-events: auto !important;\n    left: auto !important;\n    right: 40px !important; /* 우측 끝에서도 약간의 여백 */\n    width: 18% !important;\n}\n\n/* 4. 상단 컨트롤 및 홈 버튼: 레이어 최상단 고정 (클릭 보장) */\n.tc-topbar, .tc-page-controls, .tc-sidebar-header {\n    z-index: 3000 !important;\n    position: relative;\n    pointer-events: auto !important;\n}\n\n/* 클릭 영역 강제 활성화 */\nbutton.tc-btn-invisible, \nbutton.tc-btn-standard,\n.tc-page-controls svg {\n    cursor: pointer !important;\n    pointer-events: auto !important;\n}\n\n/* 5. 반응형: 화면이 작아지면 중앙 정렬로 전환 */\n@media (max-width: 1500px) {\n    .tc-story-river {\n        width: 90% !important;\n        margin-left: auto !important;\n        margin-right: auto !important;\n    }\n    .tc-sidebar-scrollable {\n        display: none; /* 화면이 작을 땐 사이드바 숨김 (필요시) */\n    }\n}","tags":"$:/tags/Stylesheet","title":"$:/_MyCustomStyle","modified":"20260405021609025","type":"text/plain"},
 {"created":"20260401120000000","modified":"20260401120000000","title":"$:/config/AutoSave","tags":"","type":"text/plain","text":"no"},
 {"created":"20260331094702714","text":"false","title":"$:/config/markdown/linkify","modified":"20260331094709232"},
 {"created":"20260331094528260","text":"show","title":"$:/config/PageControlButtons/Visibility/$:/core/ui/Buttons/home","modified":"20260331094528260"},
@@ -409,7 +406,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE." />
 {"created":"20260330142842494","title":"$:/state/tab-1749438307","text":"$:/core/ui/ControlPanel/Info","modified":"20260402143804262"},
 {"created":"20260330142921014","title":"$:/state/tab-1887445847","text":"$:/core/ui/ControlPanel/Plugins/Add/Themes","modified":"20260330142921014"},
 {"created":"20260331093817709","title":"$:/state/tab/moresidebar-1850697562","text":"$:/core/ui/MoreSideBar/System","modified":"20260405022143921"},
-{"created":"20260331093815923","title":"$:/state/tab/sidebar--595412856","text":"$:/core/ui/SideBar/Open","modified":"20260405023320441"},
+{"created":"20260331093815923","title":"$:/state/tab/sidebar--595412856","text":"$:/core/ui/SideBar/Open","modified":"20260405042117526"},
 {"created":"20260331094522449","title":"$:/state/tabs/controlpanel/toolbars-1345989671","text":"$:/core/ui/ControlPanel/Toolbars/PageControls","modified":"20260331094547682"},
 {"created":"20260331094946082","title":"$:/state/tree/$:/config/","text":"show","modified":"20260331094946082"},
 {"created":"20260401144419604","title":"$:/state/tree/$:/config/Navigation/","text":"show","modified":"20260401144419604"},
