@@ -5,7 +5,7 @@ tags: "main"
 # 🗃️ Project Archive
 
 >  기록 / 정보 기반 아카이브
-- 🐈[**github**](https://github.com/hjp8888/hjp8🐈888.github.io)
+- 🐈[**github**](https://github.com/hjp8888/hjp8888.github.io)
 <br>
 <br>
 <div align="right">
