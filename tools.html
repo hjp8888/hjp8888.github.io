@@ -1,195 +1,638 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
+    <script src="./xlsx.full.min.js"></script>
+    <script src="./marked.min.js"></script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Wiki Multi-Toolbox (Editor Update)</title>
+    <title>Wiki Multi-Toolbox (Final v2)</title>
     
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet" />
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-python.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-c.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-cpp.min.js"></script>
+    
+    <link href="./prism-tomorrow.min.css" rel="stylesheet" />
+    <script src="./prism.min.js"></script>
+    <script src="./prism-python.min.js"></script>
+    <script src="./prism-javascript.min.js"></script>
+    <script src="./prism-c.min.js"></script>
+    <script src="./prism-cpp.min.js"></script>
+    <script src="./prism-markdown.min.js"></script>
+    
 
     <style>
         :root {
-            --bg-color: #1a1a1a; --card-bg: #2d2d2d; --text-color: #e0e0e0; 
-            --accent-color: #4a90e2; --border-color: #444; 
-            --input-bg: #111; --input-text: #b5e8b0; --success-color: #2ecc71;
+            --bg-color: #1a1a1a; 
+            --card-bg: #2d2d2d; 
+            --text-color: #e0e0e0; 
+            --accent-color: #4a90e2; 
+            --nav-bg: rgba(30, 30, 30, 0.85); 
+            --subnav-bg: rgba(45, 45, 45, 0.9); 
+            --border-color: #444; 
+            --input-bg: #111; 
+            --input-text: #b5e8b0; 
+            --success-color: #2ecc71;
+            --warning-color: #f39c12;
         }
 
         body { 
             background: radial-gradient(circle at center, #262626 0%, var(--bg-color) 100%) !important;
-            color: var(--text-color); font-family: 'Pretendard', sans-serif;
-            margin: 0; padding: 20px; line-height: 1.6;
+            color: var(--text-color); 
+            font-family: 'Pretendard', -apple-system, sans-serif;
+            margin: 0; padding: 0;
+            display: flex; flex-direction: column; min-height: 100vh;
+            align-items: center; 
         }
 
-        .container { max-width: 900px; margin: 0 auto; }
+        /* [메인 Navbar] */
+        #wiki-navbar {
+            position: fixed; top: 0; left: 0; right: 0; z-index: 99999;
+            background: var(--nav-bg); display: flex; align-items: center; justify-content: center; 
+            height: 42px; backdrop-filter: blur(10px); box-shadow: 0 1px 8px rgba(0,0,0,0.2);
+            box-sizing: border-box; padding: 0 4px;
+        }
+        #wiki-navbar a {
+            color: rgba(255, 255, 255, 0.6); text-decoration: none; border-radius: 6px;
+            flex: 1; text-align: center; font-size: clamp(9px, 3vw, 13px); padding: 6px 2px;
+            white-space: nowrap; transition: 0.15s;
+        }
+        #wiki-navbar a:hover { background: rgba(255, 255, 255, 0.1); color: #fff; }
+        #wiki-navbar a.current { color: #fff; font-weight: bold; background: rgba(255,255,255,0.12); }
 
-        .tool-section {
-            background: var(--card-bg); border-radius: 12px; padding: 20px;
-            margin-bottom: 25px; border: 1px solid var(--border-color);
-            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+        /* [서브 Navbar] */
+        #sub-navbar {
+            position: fixed; top: 42px; left: 0; right: 0; z-index: 99998;
+            background: var(--subnav-bg); display: flex; align-items: center;
+            justify-content: center; height: 44px; backdrop-filter: blur(8px);
+            border-bottom: 1px solid var(--border-color);
+            overflow-x: auto; overflow-y: hidden; -webkit-overflow-scrolling: touch;
+            padding: 0 15px; box-sizing: border-box;
+        }
+        @media (max-width: 768px) { #sub-navbar { justify-content: flex-start; } }
+        #sub-navbar::-webkit-scrollbar { display: none; }
+        #sub-navbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+        .nav-tab {
+            color: rgba(255, 255, 255, 0.5); font-size: 11px; cursor: pointer;
+            padding: 0 15px; height: 100%; display: flex; align-items: center;
+            transition: 0.2s; border-bottom: 2px solid transparent; flex-shrink: 0;
+            white-space: nowrap;
+        }
+        .nav-tab.active { color: var(--accent-color); border-bottom: 2px solid var(--accent-color); font-weight: bold; }
+
+        /* 레이아웃 */
+        .tool-container {
+            width: 73% !important; max-width: 1400px;
+            margin: 0 auto !important; padding-top: 115px; padding-bottom: 60px;
+            box-sizing: border-box;
         }
 
-        h2 { margin-top: 0; font-size: 18px; color: var(--accent-color); display: flex; align-items: center; gap: 8px; }
+        .tool-content { display: none; width: 100%; animation: fadeIn 0.3s; }
+        .tool-content.active { display: block; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
 
-        /* 에디터 스타일 */
-        .editor-wrapper { position: relative; border-radius: 8px; overflow: hidden; border: 1px solid var(--border-color); background: #2d2d2d; }
+        .card { 
+            background: var(--card-bg); border-radius: 16px; padding: 25px; 
+            margin-bottom: 25px; border: 1px solid #3d3d3d; 
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+        }
+
+        textarea { 
+            width: 100%; background: var(--input-bg); color: var(--input-text); 
+            border: 1px solid var(--border-color); border-radius: 8px; 
+            padding: 12px; font-family: 'Fira Code', monospace; 
+            resize: vertical; box-sizing: border-box; margin-top: 10px; 
+            font-size: 13px; line-height: 1.6; 
+        }
         
+        button { 
+            background: var(--accent-color); color: white; border: none; 
+            padding: 10px 18px; border-radius: 8px; cursor: pointer; 
+            font-weight: bold; margin: 8px 8px 0 0; font-size: 11px; transition: 0.2s;
+        }
+        button:hover { opacity: 0.8; }
+
+        .drop-zone { 
+            border: 2px dashed var(--border-color); border-radius: 12px; 
+            padding: 30px 20px; text-align: center; cursor: pointer; 
+            transition: 0.3s; background: rgba(255,255,255,0.02); color: #aaa;
+        }
+
+        .preview-area {
+            margin-top: 20px; padding: 20px; background: #fff; color: #333; 
+            border-radius: 8px; min-height: 150px; overflow: auto;
+            font-size: 14px; line-height: 1.6;
+        }
+        /* 마크다운 내부 표 스타일 */
+        .preview-area table { border-collapse: collapse; width: 100%; margin-bottom: 1em; }
+        .preview-area th, .preview-area td { border: 1px solid #ddd; padding: 8px; }
+        .preview-area th { background-color: #f5f5f5; }
+        .preview-area img { max-width: 100%; height: auto; }
+
+        .label-desc { font-size: 12px; color: var(--accent-color); font-weight: bold; margin-top: 15px; display: block; }
+        .sub-desc { font-size: 11px; color: #888; margin-bottom: 5px; }
+
+        @media (max-width: 1024px) { .tool-container { width: 90% !important; } }
+        @media (max-width: 480px) {
+            .tool-container { padding-top: 125px; width: 95% !important; }
+            .card { padding: 18px; }
+        }
+
+        /* ── 코드 에디터 ── */
+        .editor-toolbar {
+            display: flex; align-items: center; gap: 10px;
+            margin-bottom: 10px; flex-wrap: wrap;
+        }
+        .editor-toolbar select {
+            background: var(--input-bg); color: #e0e0e0;
+            border: 1px solid var(--border-color); padding: 5px 10px;
+            border-radius: 6px; font-size: 12px; cursor: pointer;
+        }
+        .editor-toolbar button {
+            margin: 0; padding: 6px 14px; font-size: 11px;
+        }
+        .editor-toolbar .lang-label {
+            font-size: 11px; color: #888; margin-left: auto;
+        }
+
+        /* 에디터 래퍼: 줄번호 + 입력 + 하이라이트 */
+        .editor-wrapper {
+            position: relative;
+            display: flex;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            overflow: hidden;
+            background: #1e1e1e;
+            font-family: 'Fira Code', 'Consolas', monospace;
+            font-size: 14px;
+            line-height: 1.6;
+        }
+
+        /* 줄번호 영역 */
+        #line-numbers {
+            min-width: 42px;
+            padding: 14px 8px 14px 0;
+            background: #252525;
+            border-right: 1px solid #333;
+            text-align: right;
+            color: #555;
+            font-size: 13px;
+            line-height: 1.6;
+            user-select: none;
+            overflow: hidden;
+            box-sizing: border-box;
+            flex-shrink: 0;
+        }
+        #line-numbers span { display: block; padding-right: 8px; }
+
+        /* 하이라이트 + 입력 공통 영역 */
+        .editor-code-area {
+            position: relative;
+            flex: 1;
+            overflow: hidden;
+        }
+
         #code-input {
-            width: 100%; height: 300px; background: transparent; color: transparent;
-            caret-color: white; border: none; padding: 15px; font-family: 'Fira Code', monospace;
-            font-size: 14px; position: absolute; top: 0; left: 0; z-index: 1; outline: none;
-            resize: none; white-space: pre; overflow: auto;
+            position: absolute; top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: transparent;
+            color: transparent;
+            caret-color: #fff;
+            border: none; outline: none;
+            padding: 14px 14px;
+            font-family: inherit; font-size: inherit; line-height: inherit;
+            resize: none;
+            white-space: pre;
+            overflow: auto;
+            z-index: 2;
+            box-sizing: border-box;
+            tab-size: 4;
         }
 
         #highlight-area {
-            width: 100%; height: 300px; margin: 0; padding: 15px;
-            box-sizing: border-box; font-size: 14px; pointer-events: none;
-            white-space: pre; overflow: hidden;
+            position: absolute; top: 0; left: 0;
+            width: 100%; height: 100%;
+            margin: 0;
+            padding: 14px 14px;
+            font-family: inherit; font-size: inherit; line-height: inherit;
+            pointer-events: none;
+            white-space: pre;
+            overflow: hidden;
+            z-index: 1;
+            box-sizing: border-box;
+            background: transparent !important;
         }
 
-        /* 에디터 우측 상단 버튼 그룹 */
-        .editor-actions {
-            position: absolute; top: 10px; right: 15px; z-index: 10;
-            display: flex; flex-direction: column; gap: 8px;
+        /* Prism 배경 제거 */
+        #highlight-area code[class*="language-"],
+        #highlight-area pre[class*="language-"] {
+            background: transparent !important;
+            padding: 0 !important;
+            margin: 0 !important;
+            font-size: inherit !important;
+            line-height: inherit !important;
         }
 
-        .icon-btn {
-            background: rgba(255, 255, 255, 0.1); border: 1px solid rgba(255, 255, 255, 0.2);
-            color: white; padding: 6px; border-radius: 4px; cursor: pointer; font-size: 12px;
-            display: flex; align-items: center; justify-content: center; transition: 0.2s;
-        }
-
-        .icon-btn:hover { background: var(--accent-color); }
-
-        /* 공통 UI 요소 */
-        .counter-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 10px; margin-top: 15px; }
-        .stat-card { background: rgba(0,0,0,0.2); padding: 12px; border-radius: 10px; border: 1px solid var(--border-color); text-align:center; }
-        .stat-label { font-size: 11px; opacity: 0.6; }
-        .stat-value { font-size: 16px; font-weight: bold; color: var(--input-text); }
-
-        textarea.simple { width: 100%; background: var(--input-bg); color: var(--input-text); border: 1px solid var(--border-color); border-radius: 8px; padding: 10px; box-sizing: border-box; }
-        select { background: var(--input-bg); color: white; border: 1px solid var(--border-color); padding: 5px; border-radius: 4px; margin-bottom: 10px; }
+        /* 에디터 높이 컨테이너 */
+        .editor-height { height: 420px; }
     </style>
 </head>
 <body>
 
-<div class="container">
-    <div class="tool-section">
-        <h2>💻 Code Editor (VS Style)</h2>
-        <div style="display: flex; justify-content: space-between; align-items: center;">
-            <select id="lang-select" onchange="updateHighlight()">
-                <option value="markup">HTML</option>
-                <option value="python">Python</option>
-                <option value="javascript">JavaScript</option>
-                <option value="cpp">C++</option>
-                <option value="c">C</option>
-            </select>
-            <span style="font-size: 11px; opacity: 0.5;">기본 확장자: .html</span>
-        </div>
-        
-        <div class="editor-wrapper">
-            <div class="editor-actions">
-                <button class="icon-btn" onclick="copyCode()" title="코드 복사">📋 복사</button>
-                <button class="icon-btn" onclick="downloadCode()" title="파일 다운로드">💾 저장</button>
+    <nav id="wiki-navbar">
+        <a href="index.html">Home</a>
+        <a href="index2.html">Blog</a>
+        <a href="index3.html">Review</a>
+        <a href="index4.html">Earth</a>
+        <a href="index5.html">Archive🔒</a>
+        <a href="tools.html" class="current">Tools</a>
+    </nav>
+
+    <nav id="sub-navbar">
+        <div class="nav-tab active" onclick="showTool('excel')">마크다운 표</div>
+        <div class="nav-tab" onclick="showTool('image')">이미지 변환</div>
+        <div class="nav-tab" onclick="showTool('regex')">텍스트 청소</div>
+        <div class="nav-tab" onclick="showTool('counter')">글자수 분석</div>
+        <div class="nav-tab" onclick="showTool('html')">HTML 프리뷰</div>
+        <div class="nav-tab" onclick="showTool('md-preview')">마크다운 프리뷰</div>
+        <div class="nav-tab" onclick="showTool('code-editor')">코드 에디터</div>
+    </nav>
+
+    <main class="tool-container">
+        <div id="tool-excel" class="tool-content active">
+            <div class="card">
+                <div class="drop-zone" onclick="document.getElementById('excel-input').click()">
+                    <h3 style="color:#fff; margin-top:0;">Excel ➔ Markdown Table</h3>
+                    <p style="font-size:13px;">파일을 올리면 표 형식으로 변환됩니다</p>
+                    <input type="file" id="excel-input" hidden accept=".xlsx, .xls, .csv">
+                </div>
+                <div id="excel-results"></div>
             </div>
-            <textarea id="code-input" oninput="updateHighlight()" onscroll="syncScroll()" spellcheck="false" placeholder="코드를 여기에 작성하세요..."></textarea>
-            <pre id="highlight-area" aria-hidden="true"><code id="highlight-code" class="language-markup"></code></pre>
         </div>
-    </div>
 
-    <div class="tool-section">
-        <h2>📝 텍스트 분석기</h2>
-        <textarea id="count-input" class="simple" rows="5" placeholder="분석할 내용을 입력하세요..." oninput="countText()"></textarea>
-        <div id="counter-res" class="counter-grid">
-            <div class="stat-card"><div class="stat-label">공백 포함</div><div class="stat-value" id="c1">0자</div></div>
-            <div class="stat-card"><div class="stat-label">공백 제외</div><div class="stat-value" id="c2">0자</div></div>
-            <div class="stat-card"><div class="stat-label">단어 수</div><div class="stat-value" id="c3">0개</div></div>
-            <div class="stat-card"><div class="stat-label">단락 수</div><div class="stat-value" id="c4">0개</div></div>
-            <div class="stat-card"><div class="stat-label">문장 수</div><div class="stat-value" id="c5">0개</div></div>
+        <div id="tool-image" class="tool-content">
+            <div class="card">
+                <div class="drop-zone" onclick="document.getElementById('img-input').click()">
+                    <h3 style="color:#fff; margin-top:0;">Image ➔ Markdown Optimizer</h3>
+                    <p style="font-size:13px;">이미지를 마크다운 코드로 변환합니다 (BASE64)</p>
+                    <input type="file" id="img-input" hidden accept="image/*">
+                </div>
+                <div id="img-results" style="display: none;">
+                    <label class="label-desc">방법 A: 일반 인라인 방식</label>
+                    <textarea id="img-output-inline" rows="2" readonly></textarea>
+                    <button onclick="copyVal('img-output-inline')">복사</button>
+                    <hr style="border:0; border-top:1px solid #444; margin:20px 0;">
+                    <label class="label-desc" style="color:var(--warning-color)">방법 B: 참조식 마크다운 (권장)</label>
+                    <div style="display: flex; gap: 8px; align-items: flex-end;">
+                        <div style="flex:1">
+                            <p class="sub-desc">① 본문 삽입용</p>
+                            <textarea id="img-output-ref-top" rows="1" readonly style="color:var(--accent-color);"></textarea>
+                        </div>
+                        <button onclick="copyVal('img-output-ref-top')" style="margin-bottom:5px;">복사</button>
+                    </div>
+                    <div style="margin-top:10px;">
+                        <p class="sub-desc">② 문서 하단 정의용 (긴 데이터)</p>
+                        <textarea id="img-output-ref-bottom" rows="3" readonly style="font-size:11px;"></textarea>
+                        <button onclick="copyVal('img-output-ref-bottom')" style="background:var(--success-color); width:100%; margin-top:8px;">하단 데이터 전체 복사</button>
+                    </div>
+                </div>
+            </div>
         </div>
-    </div>
 
-    <div class="tool-section">
-        <h2>📊 Excel to MD</h2>
-        <input type="file" id="xl-input" accept=".xlsx, .xls">
-        <div id="xl-res"></div>
-    </div>
-</div>
+        <div id="tool-regex" class="tool-content">
+            <div class="card">
+                <h3 style="margin-top:0; color:#fff;">Text Cleaner</h3>
+                <textarea id="regex-input" rows="8" placeholder="원본 텍스트..."></textarea>
+                <div>
+                    <button onclick="cleanText('header-up')"># 제목 높이기</button>
+                    <button onclick="cleanText('header')"># 제목 낮추기</button>
+                    <button onclick="cleanText('list')">* 리스트화</button>
+                    <button onclick="cleanText('space')">공백 제거</button>
+                </div>
+                <textarea id="regex-output" rows="8" readonly></textarea>
+                <button onclick="copyVal('regex-output')" style="background: var(--success-color);">결과 복사</button>
+            </div>
+        </div>
 
-<script>
-    // --- 코드 에디터 로직 ---
-    function updateHighlight() {
-        const code = document.getElementById('code-input').value;
-        const lang = document.getElementById('lang-select').value;
-        const target = document.getElementById('highlight-code');
-        
-        target.className = 'language-' + lang;
-        target.textContent = code + (code.endsWith('\n') ? ' ' : '');
-        Prism.highlightElement(target);
-    }
+        <div id="tool-counter" class="tool-content">
+            <div class="card">
+                <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:14px;">
+                    <h3 style="color:#fff; margin:0;">Content Analyzer</h3>
+                    <button onclick="document.getElementById('counter-input').value=''; analyzeText();"
+                        style="background:#e74c3c; padding:5px 12px; font-size:10px; margin:0;">초기화</button>
+                </div>
+                <textarea id="counter-input" rows="10"
+                    placeholder="분석할 텍스트를 입력하세요..."
+                    oninput="analyzeText()"
+                    style="margin-top:0;"></textarea>
 
-    function syncScroll() {
-        const input = document.getElementById('code-input');
-        const area = document.getElementById('highlight-area');
-        area.scrollTop = input.scrollTop;
-        area.scrollLeft = input.scrollLeft;
-    }
+                <div style="
+                    display: grid;
+                    grid-template-columns: repeat(3, 1fr);
+                    gap: 10px;
+                    margin-top: 16px;
+                ">
+                    <div style="background:rgba(74,144,226,0.12); border:1px solid rgba(74,144,226,0.3); border-radius:10px; padding:14px; text-align:center;">
+                        <div style="font-size:11px; color:#888; margin-bottom:4px;">공백 포함</div>
+                        <div id="stat-char" style="font-size:22px; font-weight:bold; color:#4a90e2; font-family:'Fira Code',monospace;">0</div>
+                        <div style="font-size:10px; color:#555; margin-top:2px;">자</div>
+                    </div>
+                    <div style="background:rgba(46,204,113,0.1); border:1px solid rgba(46,204,113,0.25); border-radius:10px; padding:14px; text-align:center;">
+                        <div style="font-size:11px; color:#888; margin-bottom:4px;">공백 제외</div>
+                        <div id="stat-no-space" style="font-size:22px; font-weight:bold; color:#2ecc71; font-family:'Fira Code',monospace;">0</div>
+                        <div style="font-size:10px; color:#555; margin-top:2px;">자</div>
+                    </div>
+                    <div style="background:rgba(243,156,18,0.1); border:1px solid rgba(243,156,18,0.25); border-radius:10px; padding:14px; text-align:center;">
+                        <div style="font-size:11px; color:#888; margin-bottom:4px;">단어 수</div>
+                        <div id="stat-word" style="font-size:22px; font-weight:bold; color:#f39c12; font-family:'Fira Code',monospace;">0</div>
+                        <div style="font-size:10px; color:#555; margin-top:2px;">개</div>
+                    </div>
+                    <div style="background:rgba(155,89,182,0.1); border:1px solid rgba(155,89,182,0.25); border-radius:10px; padding:14px; text-align:center;">
+                        <div style="font-size:11px; color:#888; margin-bottom:4px;">문장 수</div>
+                        <div id="stat-sentence" style="font-size:22px; font-weight:bold; color:#9b59b6; font-family:'Fira Code',monospace;">0</div>
+                        <div style="font-size:10px; color:#555; margin-top:2px;">개</div>
+                    </div>
+                    <div style="background:rgba(231,76,60,0.1); border:1px solid rgba(231,76,60,0.25); border-radius:10px; padding:14px; text-align:center;">
+                        <div style="font-size:11px; color:#888; margin-bottom:4px;">단락 수</div>
+                        <div id="stat-para" style="font-size:22px; font-weight:bold; color:#e74c3c; font-family:'Fira Code',monospace;">0</div>
+                        <div style="font-size:10px; color:#555; margin-top:2px;">개</div>
+                    </div>
+                    <div style="background:rgba(26,188,156,0.1); border:1px solid rgba(26,188,156,0.25); border-radius:10px; padding:14px; text-align:center;">
+                        <div style="font-size:11px; color:#888; margin-bottom:4px;">줄 수</div>
+                        <div id="stat-line" style="font-size:22px; font-weight:bold; color:#1abc9c; font-family:'Fira Code',monospace;">0</div>
+                        <div style="font-size:10px; color:#555; margin-top:2px;">줄</div>
+                    </div>
+                </div>
 
-    function copyCode() {
-        const code = document.getElementById('code-input').value;
-        navigator.clipboard.writeText(code).then(() => {
-            alert('클립보드에 복사되었습니다!');
-        });
-    }
+                <!-- 바 시각화 -->
+                <div style="margin-top:16px; background:rgba(0,0,0,0.2); border-radius:8px; padding:12px;">
+                    <div style="font-size:11px; color:#666; margin-bottom:8px;">공백포함 / 공백제외 비율</div>
+                    <div style="height:8px; background:#333; border-radius:4px; overflow:hidden;">
+                        <div id="stat-bar" style="height:100%; width:100%; background:linear-gradient(90deg, #4a90e2, #2ecc71); border-radius:4px; transition:width 0.3s;"></div>
+                    </div>
+                    <div id="stat-bar-label" style="font-size:10px; color:#555; margin-top:5px; text-align:right;">공백 0자</div>
+                </div>
+            </div>
+        </div>
 
-    function downloadCode() {
-        const code = document.getElementById('code-input').value;
-        const lang = document.getElementById('lang-select').value;
-        const extensions = { markup: 'html', python: 'py', javascript: 'js', cpp: 'cpp', c: 'c' };
-        const ext = extensions[lang] || 'txt';
-        
-        const blob = new Blob([code], { type: 'text/plain' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `script_${new Date().getTime()}.${ext}`;
-        a.click();
-        URL.revokeObjectURL(url);
-    }
+        <div id="tool-html" class="tool-content">
+            <div class="card">
+                <h3 style="color:#fff; margin:0;">HTML Live Preview</h3>
+                <textarea id="html-preview-input" rows="8" placeholder="HTML 코드를 입력하세요..." oninput="renderHTML()"></textarea>
+                <div id="html-display-area" class="preview-area"></div>
+            </div>
+        </div>
 
-    // --- 텍스트 분석 로직 ---
-    function countText() {
-        const text = document.getElementById('count-input').value;
-        if (!text) return;
-        document.getElementById('c1').innerText = text.length + "자";
-        document.getElementById('c2').innerText = text.replace(/\s/g, '').length + "자";
-        document.getElementById('c3').innerText = (text.trim() ? text.trim().split(/\s+/).length : 0) + "개";
-        document.getElementById('c4').innerText = text.split(/\n+/).filter(p => p.trim()).length + "개";
-        document.getElementById('c5').innerText = text.split(/[.!?]+/).filter(s => s.trim()).length + "개";
-    }
+        <div id="tool-md-preview" class="tool-content">
+            <div class="card">
+                <h3 style="color:#fff; margin:0;">Markdown Live Preview</h3>
+                <textarea id="md-preview-input" rows="10" placeholder="마크다운 문법으로 작성하세요..." oninput="renderMD()"></textarea>
+                <div id="md-display-area" class="preview-area"></div>
+            </div>
+        </div>
 
-    // --- 엑셀 로직 (기존 유지) ---
-    document.getElementById('xl-input').onchange = function(e) {
-        const file = e.target.files[0];
-        const reader = new FileReader();
-        reader.onload = function(e) {
-            const data = new Uint8Array(e.target.result);
-            const workbook = XLSX.read(data, {type: 'array'});
-            const firstSheet = workbook.SheetNames[0];
-            const json = XLSX.utils.sheet_to_json(workbook.Sheets[firstSheet], {header: 1});
-            if(json.length > 0) {
-                let md = "| " + json[0].join(" | ") + " |\n| " + json[0].map(()=>"---").join(" | ") + " |\n" +
-                         json.slice(1).map(row => "| " + row.join(" | ") + " |").join("\n");
-                document.getElementById('xl-res').innerHTML = `<textarea class="simple" rows="5" readonly>${md}</textarea>`;
-            }
+        <!-- 코드 에디터 -->
+        <div id="tool-code-editor" class="tool-content">
+            <div class="card">
+                <h3 style="color:#fff; margin:0 0 15px 0;">Code Editor</h3>
+
+                <div class="editor-toolbar">
+                    <select id="lang-select" onchange="changeLanguage()">
+                        <option value="markup">HTML</option>
+                        <option value="python">Python</option>
+                        <option value="javascript">JavaScript</option>
+                        <option value="cpp">C++</option>
+                        <option value="c">C</option>
+                        <option value="markdown">Markdown</option>
+                        <option value="none">기타 (Plain)</option>
+                    </select>
+                    <button onclick="copyCode()">📋 복사</button>
+                    <button onclick="downloadCode()" style="background:#2ecc71;">💾 저장</button>
+                    <button onclick="clearCode()" style="background:#e74c3c;">🗑 초기화</button>
+                    <span class="lang-label" id="lang-label-display">HTML · .html</span>
+                </div>
+
+                <div class="editor-wrapper editor-height">
+                    <div id="line-numbers"></div>
+                    <div class="editor-code-area">
+                        <textarea
+                            id="code-input"
+                            spellcheck="false"
+                            autocomplete="off"
+                            autocorrect="off"
+                            autocapitalize="off"
+                            placeholder="코드를 입력하세요..."
+                            oninput="onEditorInput()"
+                            onscroll="syncEditorScroll()"
+                            onkeydown="handleTabKey(event)"
+                        ></textarea>
+                        <pre id="highlight-area" aria-hidden="true"><code id="highlight-code" class="language-markup"></code></pre>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        function showTool(toolId) {
+            document.querySelectorAll('.tool-content').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.nav-tab').forEach(el => el.classList.remove('active'));
+            document.getElementById('tool-' + toolId).classList.add('active');
+            event.currentTarget.classList.add('active');
+        }
+
+        // 프리뷰 로직
+        function renderHTML() {
+            document.getElementById('html-display-area').innerHTML = document.getElementById('html-preview-input').value;
+        }
+
+        function renderMD() {
+            const input = document.getElementById('md-preview-input').value;
+            document.getElementById('md-display-area').innerHTML = marked.parse(input);
+        }
+
+        function analyzeText() {
+            const val = document.getElementById('counter-input').value;
+            const withSpace   = val.length;
+            const noSpace     = val.replace(/\s/g, '').length;
+            const wordCount   = val.trim() === '' ? 0 : val.trim().split(/\s+/).length;
+            const sentences   = val.trim() === '' ? 0 : val.split(/[.!?。！？]+/).filter(s => s.trim()).length;
+            const paragraphs  = val.trim() === '' ? 0 : val.split(/\n{2,}/).filter(p => p.trim()).length || (val.trim() ? 1 : 0);
+            const lines       = val === '' ? 0 : val.split('\n').length;
+
+            document.getElementById('stat-char').innerText     = withSpace.toLocaleString();
+            document.getElementById('stat-no-space').innerText = noSpace.toLocaleString();
+            document.getElementById('stat-word').innerText     = wordCount.toLocaleString();
+            document.getElementById('stat-sentence').innerText = sentences.toLocaleString();
+            document.getElementById('stat-para').innerText     = paragraphs.toLocaleString();
+            document.getElementById('stat-line').innerText     = lines.toLocaleString();
+
+            // 바 시각화
+            const spaceCount = withSpace - noSpace;
+            const ratio = withSpace > 0 ? Math.round((noSpace / withSpace) * 100) : 100;
+            document.getElementById('stat-bar').style.width = ratio + '%';
+            document.getElementById('stat-bar-label').innerText = `공백 ${spaceCount.toLocaleString()}자 (전체의 ${100 - ratio}%)`;
+        }
+
+        function cleanText(mode) {
+            let val = document.getElementById('regex-input').value;
+            if (mode === 'header-up') val = val.replace(/^(#{1,5})(?!#)/gm, (_, hashes) => hashes.slice(1) || '#');
+            if (mode === 'header') val = val.replace(/^#/gm, '##');
+            if (mode === 'list') val = val.replace(/^/gm, '* ');
+            if (mode === 'space') val = val.replace(/^\s*[\r\n]/gm, '');
+            document.getElementById('regex-output').value = val;
+        }
+
+        document.getElementById('img-input').onchange = (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (ev) => {
+                const b64 = ev.target.result;
+                const label = `img_${Math.random().toString(36).substr(2, 5)}`;
+                document.getElementById('img-output-inline').value = `![${file.name}](${b64})`;
+                document.getElementById('img-output-ref-top').value = `![${file.name}][${label}]`;
+                document.getElementById('img-output-ref-bottom').value = `[${label}]: ${b64}`;
+                document.getElementById('img-results').style.display = 'block';
+            };
+            reader.readAsDataURL(file);
         };
-        reader.readAsArrayBuffer(file);
-    };
-</script>
 
+        document.getElementById('excel-input').onchange = (e) => {
+            const file = e.target.files[0];
+            const reader = new FileReader();
+            reader.onload = (ev) => {
+                const workbook = XLSX.read(new Uint8Array(ev.target.result), {type: 'array'});
+                const res = document.getElementById('excel-results');
+                res.innerHTML = '';
+                workbook.SheetNames.forEach(name => {
+                    const json = XLSX.utils.sheet_to_json(workbook.Sheets[name], {header: 1});
+                    if(json.length > 0) {
+                        const clean = (v) => String(v || "").replace(/\|/g, "\\|");
+                        let md = "| " + json[0].map(clean).join(" | ") + " |\n| " + json[0].map(()=>"---").join(" | ") + " |\n" +
+                                   json.slice(1).map(row => "| " + row.map(clean).join(" | ") + " |").join("\n");
+                        const div = document.createElement('div');
+                        div.innerHTML = `<p style="margin-top:20px; font-weight:bold; color:var(--accent-color); font-size:12px;">Sheet: ${name}</p>
+                                         <textarea id="p-${name}" rows="5" readonly>${md}</textarea>
+                                         <button onclick="copyVal('p-${name}')">복사</button>`;
+                        res.appendChild(div);
+                    }
+                });
+            };
+            reader.readAsArrayBuffer(file);
+        };
+
+        function copyVal(id) {
+            const val = document.getElementById(id).value;
+            navigator.clipboard.writeText(val).then(() => {
+                const btn = event.target;
+                const oldText = btn.innerText;
+                btn.innerText = "복사됨!";
+                btn.style.background = "var(--success-color)";
+                setTimeout(() => { btn.innerText = oldText; btn.style.background = ""; }, 1200);
+            });
+        }
+
+        /* ── 코드 에디터 ── */
+        const LANG_META = {
+            markup:     { label: 'HTML',       ext: 'html' },
+            python:     { label: 'Python',     ext: 'py'   },
+            javascript: { label: 'JavaScript', ext: 'js'   },
+            cpp:        { label: 'C++',        ext: 'cpp'  },
+            c:          { label: 'C',          ext: 'c'    },
+            markdown:   { label: 'Markdown',   ext: 'md'   },
+            none:       { label: '기타 (Plain)', ext: 'txt' },
+        };
+
+        function changeLanguage() {
+            const lang = document.getElementById('lang-select').value;
+            const meta = LANG_META[lang];
+            document.getElementById('lang-label-display').textContent = `${meta.label} · .${meta.ext}`;
+            updateHighlight();
+        }
+
+        function onEditorInput() {
+            updateHighlight();
+            updateLineNumbers();
+        }
+
+        function updateHighlight() {
+            const code = document.getElementById('code-input').value;
+            const lang = document.getElementById('lang-select').value;
+            const target = document.getElementById('highlight-code');
+
+            if (lang === 'none') {
+                target.className = '';
+                target.textContent = code + (code.endsWith('\n') ? ' ' : '');
+                return;
+            }
+            target.className = 'language-' + lang;
+            target.textContent = code + (code.endsWith('\n') ? ' ' : '');
+            Prism.highlightElement(target);
+        }
+
+        function updateLineNumbers() {
+            const code = document.getElementById('code-input').value;
+            const lines = code.split('\n');
+            const lineCount = lines.length;
+            const container = document.getElementById('line-numbers');
+            let html = '';
+            for (let i = 1; i <= lineCount; i++) {
+                html += `<span>${i}</span>`;
+            }
+            container.innerHTML = html;
+        }
+
+        function syncEditorScroll() {
+            const input = document.getElementById('code-input');
+            const highlight = document.getElementById('highlight-area');
+            const lineNums = document.getElementById('line-numbers');
+            highlight.scrollTop = input.scrollTop;
+            highlight.scrollLeft = input.scrollLeft;
+            lineNums.scrollTop = input.scrollTop;
+        }
+
+        function handleTabKey(e) {
+            if (e.key === 'Tab') {
+                e.preventDefault();
+                const ta = e.target;
+                const start = ta.selectionStart;
+                const end = ta.selectionEnd;
+                ta.value = ta.value.substring(0, start) + '    ' + ta.value.substring(end);
+                ta.selectionStart = ta.selectionEnd = start + 4;
+                onEditorInput();
+            }
+        }
+
+        function copyCode() {
+            const code = document.getElementById('code-input').value;
+            navigator.clipboard.writeText(code).then(() => {
+                const btn = event.target;
+                const old = btn.innerText;
+                btn.innerText = '복사됨!';
+                btn.style.background = 'var(--success-color)';
+                setTimeout(() => { btn.innerText = old; btn.style.background = ''; }, 1200);
+            });
+        }
+
+        function downloadCode() {
+            const code = document.getElementById('code-input').value;
+            const lang = document.getElementById('lang-select').value;
+            const ext = LANG_META[lang]?.ext || 'txt';
+            const blob = new Blob([code], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `code_${Date.now()}.${ext}`;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        function clearCode() {
+            if (!confirm('코드를 초기화할까요?')) return;
+            document.getElementById('code-input').value = '';
+            onEditorInput();
+        }
+
+        // 초기 줄번호
+        updateLineNumbers();
+    </script>
 </body>
 </html>
