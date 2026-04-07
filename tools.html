@@ -1,321 +1,195 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-    <script src="./xlsx.full.min.js"></script>
-    <script src="./marked.min.js"></script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Wiki Multi-Toolbox (Final v2)</title>
+    <title>Wiki Multi-Toolbox (Editor Update)</title>
     
-    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-python.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-c.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-cpp.min.js"></script>
 
     <style>
         :root {
-            --bg-color: #1a1a1a; 
-            --card-bg: #2d2d2d; 
-            --text-color: #e0e0e0; 
-            --accent-color: #4a90e2; 
-            --nav-bg: rgba(30, 30, 30, 0.85); 
-            --subnav-bg: rgba(45, 45, 45, 0.9); 
-            --border-color: #444; 
-            --input-bg: #111; 
-            --input-text: #b5e8b0; 
-            --success-color: #2ecc71;
-            --warning-color: #f39c12;
+            --bg-color: #1a1a1a; --card-bg: #2d2d2d; --text-color: #e0e0e0; 
+            --accent-color: #4a90e2; --border-color: #444; 
+            --input-bg: #111; --input-text: #b5e8b0; --success-color: #2ecc71;
         }
 
         body { 
             background: radial-gradient(circle at center, #262626 0%, var(--bg-color) 100%) !important;
-            color: var(--text-color); 
-            font-family: 'Pretendard', -apple-system, sans-serif;
-            margin: 0; padding: 0;
-            display: flex; flex-direction: column; min-height: 100vh;
-            align-items: center; 
+            color: var(--text-color); font-family: 'Pretendard', sans-serif;
+            margin: 0; padding: 20px; line-height: 1.6;
         }
 
-        /* [메인 Navbar] */
-        #wiki-navbar {
-            position: fixed; top: 0; left: 0; right: 0; z-index: 99999;
-            background: var(--nav-bg); display: flex; align-items: center; justify-content: center; 
-            height: 42px; backdrop-filter: blur(10px); box-shadow: 0 1px 8px rgba(0,0,0,0.2);
-            box-sizing: border-box; padding: 0 4px;
-        }
-        #wiki-navbar a {
-            color: rgba(255, 255, 255, 0.6); text-decoration: none; border-radius: 6px;
-            flex: 1; text-align: center; font-size: clamp(9px, 3vw, 13px); padding: 6px 2px;
-            white-space: nowrap; transition: 0.15s;
-        }
-        #wiki-navbar a:hover { background: rgba(255, 255, 255, 0.1); color: #fff; }
-        #wiki-navbar a.current { color: #fff; font-weight: bold; background: rgba(255,255,255,0.12); }
+        .container { max-width: 900px; margin: 0 auto; }
 
-        /* [서브 Navbar] */
-        #sub-navbar {
-            position: fixed; top: 42px; left: 0; right: 0; z-index: 99998;
-            background: var(--subnav-bg); display: flex; align-items: center;
-            justify-content: center; height: 44px; backdrop-filter: blur(8px);
-            border-bottom: 1px solid var(--border-color);
-            overflow-x: auto; overflow-y: hidden; -webkit-overflow-scrolling: touch;
-            padding: 0 15px; box-sizing: border-box;
-        }
-        @media (max-width: 768px) { #sub-navbar { justify-content: flex-start; } }
-        #sub-navbar::-webkit-scrollbar { display: none; }
-        #sub-navbar { -ms-overflow-style: none; scrollbar-width: none; }
-
-        .nav-tab {
-            color: rgba(255, 255, 255, 0.5); font-size: 11px; cursor: pointer;
-            padding: 0 15px; height: 100%; display: flex; align-items: center;
-            transition: 0.2s; border-bottom: 2px solid transparent; flex-shrink: 0;
-            white-space: nowrap;
-        }
-        .nav-tab.active { color: var(--accent-color); border-bottom: 2px solid var(--accent-color); font-weight: bold; }
-
-        /* 레이아웃 */
-        .tool-container {
-            width: 73% !important; max-width: 1400px;
-            margin: 0 auto !important; padding-top: 115px; padding-bottom: 60px;
-            box-sizing: border-box;
+        .tool-section {
+            background: var(--card-bg); border-radius: 12px; padding: 20px;
+            margin-bottom: 25px; border: 1px solid var(--border-color);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
         }
 
-        .tool-content { display: none; width: 100%; animation: fadeIn 0.3s; }
-        .tool-content.active { display: block; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+        h2 { margin-top: 0; font-size: 18px; color: var(--accent-color); display: flex; align-items: center; gap: 8px; }
 
-        .card { 
-            background: var(--card-bg); border-radius: 16px; padding: 25px; 
-            margin-bottom: 25px; border: 1px solid #3d3d3d; 
-            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
-        }
-
-        textarea { 
-            width: 100%; background: var(--input-bg); color: var(--input-text); 
-            border: 1px solid var(--border-color); border-radius: 8px; 
-            padding: 12px; font-family: 'Fira Code', monospace; 
-            resize: vertical; box-sizing: border-box; margin-top: 10px; 
-            font-size: 13px; line-height: 1.6; 
-        }
+        /* 에디터 스타일 */
+        .editor-wrapper { position: relative; border-radius: 8px; overflow: hidden; border: 1px solid var(--border-color); background: #2d2d2d; }
         
-        button { 
-            background: var(--accent-color); color: white; border: none; 
-            padding: 10px 18px; border-radius: 8px; cursor: pointer; 
-            font-weight: bold; margin: 8px 8px 0 0; font-size: 11px; transition: 0.2s;
-        }
-        button:hover { opacity: 0.8; }
-
-        .drop-zone { 
-            border: 2px dashed var(--border-color); border-radius: 12px; 
-            padding: 30px 20px; text-align: center; cursor: pointer; 
-            transition: 0.3s; background: rgba(255,255,255,0.02); color: #aaa;
+        #code-input {
+            width: 100%; height: 300px; background: transparent; color: transparent;
+            caret-color: white; border: none; padding: 15px; font-family: 'Fira Code', monospace;
+            font-size: 14px; position: absolute; top: 0; left: 0; z-index: 1; outline: none;
+            resize: none; white-space: pre; overflow: auto;
         }
 
-        .preview-area {
-            margin-top: 20px; padding: 20px; background: #fff; color: #333; 
-            border-radius: 8px; min-height: 150px; overflow: auto;
-            font-size: 14px; line-height: 1.6;
+        #highlight-area {
+            width: 100%; height: 300px; margin: 0; padding: 15px;
+            box-sizing: border-box; font-size: 14px; pointer-events: none;
+            white-space: pre; overflow: hidden;
         }
-        /* 마크다운 내부 표 스타일 */
-        .preview-area table { border-collapse: collapse; width: 100%; margin-bottom: 1em; }
-        .preview-area th, .preview-area td { border: 1px solid #ddd; padding: 8px; }
-        .preview-area th { background-color: #f5f5f5; }
-        .preview-area img { max-width: 100%; height: auto; }
 
-        .label-desc { font-size: 12px; color: var(--accent-color); font-weight: bold; margin-top: 15px; display: block; }
-        .sub-desc { font-size: 11px; color: #888; margin-bottom: 5px; }
-
-        @media (max-width: 1024px) { .tool-container { width: 90% !important; } }
-        @media (max-width: 480px) {
-            .tool-container { padding-top: 125px; width: 95% !important; }
-            .card { padding: 18px; }
+        /* 에디터 우측 상단 버튼 그룹 */
+        .editor-actions {
+            position: absolute; top: 10px; right: 15px; z-index: 10;
+            display: flex; flex-direction: column; gap: 8px;
         }
+
+        .icon-btn {
+            background: rgba(255, 255, 255, 0.1); border: 1px solid rgba(255, 255, 255, 0.2);
+            color: white; padding: 6px; border-radius: 4px; cursor: pointer; font-size: 12px;
+            display: flex; align-items: center; justify-content: center; transition: 0.2s;
+        }
+
+        .icon-btn:hover { background: var(--accent-color); }
+
+        /* 공통 UI 요소 */
+        .counter-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 10px; margin-top: 15px; }
+        .stat-card { background: rgba(0,0,0,0.2); padding: 12px; border-radius: 10px; border: 1px solid var(--border-color); text-align:center; }
+        .stat-label { font-size: 11px; opacity: 0.6; }
+        .stat-value { font-size: 16px; font-weight: bold; color: var(--input-text); }
+
+        textarea.simple { width: 100%; background: var(--input-bg); color: var(--input-text); border: 1px solid var(--border-color); border-radius: 8px; padding: 10px; box-sizing: border-box; }
+        select { background: var(--input-bg); color: white; border: 1px solid var(--border-color); padding: 5px; border-radius: 4px; margin-bottom: 10px; }
     </style>
 </head>
 <body>
 
-    <nav id="wiki-navbar">
-        <a href="index.html">Home</a>
-        <a href="index2.html">Blog</a>
-        <a href="index3.html">Review</a>
-        <a href="index4.html">Earth</a>
-        <a href="index5.html">Archive🔒</a>
-        <a href="tools.html" class="current">Tools</a>
-    </nav>
-
-    <nav id="sub-navbar">
-        <div class="nav-tab active" onclick="showTool('excel')">마크다운 표</div>
-        <div class="nav-tab" onclick="showTool('image')">이미지 변환</div>
-        <div class="nav-tab" onclick="showTool('regex')">텍스트 청소</div>
-        <div class="nav-tab" onclick="showTool('counter')">글자수 분석</div>
-        <div class="nav-tab" onclick="showTool('html')">HTML 프리뷰</div>
-        <div class="nav-tab" onclick="showTool('md-preview')">마크다운 프리뷰</div>
-    </nav>
-
-    <main class="tool-container">
-        <div id="tool-excel" class="tool-content active">
-            <div class="card">
-                <div class="drop-zone" onclick="document.getElementById('excel-input').click()">
-                    <h3 style="color:#fff; margin-top:0;">Excel ➔ Markdown Table</h3>
-                    <p style="font-size:13px;">파일을 올리면 표 형식으로 변환됩니다</p>
-                    <input type="file" id="excel-input" hidden accept=".xlsx, .xls, .csv">
-                </div>
-                <div id="excel-results"></div>
-            </div>
+<div class="container">
+    <div class="tool-section">
+        <h2>💻 Code Editor (VS Style)</h2>
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+            <select id="lang-select" onchange="updateHighlight()">
+                <option value="markup">HTML</option>
+                <option value="python">Python</option>
+                <option value="javascript">JavaScript</option>
+                <option value="cpp">C++</option>
+                <option value="c">C</option>
+            </select>
+            <span style="font-size: 11px; opacity: 0.5;">기본 확장자: .html</span>
         </div>
-
-        <div id="tool-image" class="tool-content">
-            <div class="card">
-                <div class="drop-zone" onclick="document.getElementById('img-input').click()">
-                    <h3 style="color:#fff; margin-top:0;">Image ➔ Markdown Optimizer</h3>
-                    <p style="font-size:13px;">이미지를 BASE64 코드로 변환합니다</p>
-                    <input type="file" id="img-input" hidden accept="image/*">
-                </div>
-                <div id="img-results" style="display: none;">
-                    <label class="label-desc">방법 A: 일반 인라인 방식</label>
-                    <textarea id="img-output-inline" rows="2" readonly></textarea>
-                    <button onclick="copyVal('img-output-inline')">복사</button>
-                    <hr style="border:0; border-top:1px solid #444; margin:20px 0;">
-                    <label class="label-desc" style="color:var(--warning-color)">방법 B: 참조식 마크다운 (권장)</label>
-                    <div style="display: flex; gap: 8px; align-items: flex-end;">
-                        <div style="flex:1">
-                            <p class="sub-desc">① 본문 삽입용</p>
-                            <textarea id="img-output-ref-top" rows="1" readonly style="color:var(--accent-color);"></textarea>
-                        </div>
-                        <button onclick="copyVal('img-output-ref-top')" style="margin-bottom:5px;">복사</button>
-                    </div>
-                    <div style="margin-top:10px;">
-                        <p class="sub-desc">② 문서 하단 정의용 (긴 데이터)</p>
-                        <textarea id="img-output-ref-bottom" rows="3" readonly style="font-size:11px;"></textarea>
-                        <button onclick="copyVal('img-output-ref-bottom')" style="background:var(--success-color); width:100%; margin-top:8px;">하단 데이터 전체 복사</button>
-                    </div>
-                </div>
+        
+        <div class="editor-wrapper">
+            <div class="editor-actions">
+                <button class="icon-btn" onclick="copyCode()" title="코드 복사">📋 복사</button>
+                <button class="icon-btn" onclick="downloadCode()" title="파일 다운로드">💾 저장</button>
             </div>
+            <textarea id="code-input" oninput="updateHighlight()" onscroll="syncScroll()" spellcheck="false" placeholder="코드를 여기에 작성하세요..."></textarea>
+            <pre id="highlight-area" aria-hidden="true"><code id="highlight-code" class="language-markup"></code></pre>
         </div>
+    </div>
 
-        <div id="tool-regex" class="tool-content">
-            <div class="card">
-                <h3 style="margin-top:0; color:#fff;">Text Cleaner</h3>
-                <textarea id="regex-input" rows="8" placeholder="원본 텍스트..."></textarea>
-                <div>
-                    <button onclick="cleanText('header-up')"># 제목 높이기</button>
-                    <button onclick="cleanText('header')"># 제목 낮추기</button>
-                    <button onclick="cleanText('list')">* 리스트화</button>
-                    <button onclick="cleanText('space')">공백 제거</button>
-                </div>
-                <textarea id="regex-output" rows="8" readonly></textarea>
-                <button onclick="copyVal('regex-output')" style="background: var(--success-color);">결과 복사</button>
-            </div>
+    <div class="tool-section">
+        <h2>📝 텍스트 분석기</h2>
+        <textarea id="count-input" class="simple" rows="5" placeholder="분석할 내용을 입력하세요..." oninput="countText()"></textarea>
+        <div id="counter-res" class="counter-grid">
+            <div class="stat-card"><div class="stat-label">공백 포함</div><div class="stat-value" id="c1">0자</div></div>
+            <div class="stat-card"><div class="stat-label">공백 제외</div><div class="stat-value" id="c2">0자</div></div>
+            <div class="stat-card"><div class="stat-label">단어 수</div><div class="stat-value" id="c3">0개</div></div>
+            <div class="stat-card"><div class="stat-label">단락 수</div><div class="stat-value" id="c4">0개</div></div>
+            <div class="stat-card"><div class="stat-label">문장 수</div><div class="stat-value" id="c5">0개</div></div>
         </div>
+    </div>
 
-        <div id="tool-counter" class="tool-content">
-            <div class="card">
-                <h3 style="color:#fff; margin:0;">Content Analyzer</h3>
-                <textarea id="counter-input" rows="10" oninput="analyzeText()"></textarea>
-                <div class="stat-grid">
-                    <div class="stat-item"><span id="stat-char">0</span><label>공백포함</label></div>
-                    <div class="stat-item"><span id="stat-no-space">0</span><label>공백제외</label></div>
-                    <div class="stat-item"><span id="stat-word">0</span><label>단어수</label></div>
-                </div>
-            </div>
-        </div>
+    <div class="tool-section">
+        <h2>📊 Excel to MD</h2>
+        <input type="file" id="xl-input" accept=".xlsx, .xls">
+        <div id="xl-res"></div>
+    </div>
+</div>
 
-        <div id="tool-html" class="tool-content">
-            <div class="card">
-                <h3 style="color:#fff; margin:0;">HTML Live Preview</h3>
-                <textarea id="html-preview-input" rows="8" placeholder="HTML 코드를 입력하세요..." oninput="renderHTML()"></textarea>
-                <div id="html-display-area" class="preview-area"></div>
-            </div>
-        </div>
+<script>
+    // --- 코드 에디터 로직 ---
+    function updateHighlight() {
+        const code = document.getElementById('code-input').value;
+        const lang = document.getElementById('lang-select').value;
+        const target = document.getElementById('highlight-code');
+        
+        target.className = 'language-' + lang;
+        target.textContent = code + (code.endsWith('\n') ? ' ' : '');
+        Prism.highlightElement(target);
+    }
 
-        <div id="tool-md-preview" class="tool-content">
-            <div class="card">
-                <h3 style="color:#fff; margin:0;">Markdown Live Preview</h3>
-                <textarea id="md-preview-input" rows="10" placeholder="마크다운 문법으로 작성하세요..." oninput="renderMD()"></textarea>
-                <div id="md-display-area" class="preview-area"></div>
-            </div>
-        </div>
-    </main>
+    function syncScroll() {
+        const input = document.getElementById('code-input');
+        const area = document.getElementById('highlight-area');
+        area.scrollTop = input.scrollTop;
+        area.scrollLeft = input.scrollLeft;
+    }
 
-    <script>
-        function showTool(toolId) {
-            document.querySelectorAll('.tool-content').forEach(el => el.classList.remove('active'));
-            document.querySelectorAll('.nav-tab').forEach(el => el.classList.remove('active'));
-            document.getElementById('tool-' + toolId).classList.add('active');
-            event.currentTarget.classList.add('active');
-        }
+    function copyCode() {
+        const code = document.getElementById('code-input').value;
+        navigator.clipboard.writeText(code).then(() => {
+            alert('클립보드에 복사되었습니다!');
+        });
+    }
 
-        // 프리뷰 로직
-        function renderHTML() {
-            document.getElementById('html-display-area').innerHTML = document.getElementById('html-preview-input').value;
-        }
+    function downloadCode() {
+        const code = document.getElementById('code-input').value;
+        const lang = document.getElementById('lang-select').value;
+        const extensions = { markup: 'html', python: 'py', javascript: 'js', cpp: 'cpp', c: 'c' };
+        const ext = extensions[lang] || 'txt';
+        
+        const blob = new Blob([code], { type: 'text/plain' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `script_${new Date().getTime()}.${ext}`;
+        a.click();
+        URL.revokeObjectURL(url);
+    }
 
-        function renderMD() {
-            const input = document.getElementById('md-preview-input').value;
-            document.getElementById('md-display-area').innerHTML = marked.parse(input);
-        }
+    // --- 텍스트 분석 로직 ---
+    function countText() {
+        const text = document.getElementById('count-input').value;
+        if (!text) return;
+        document.getElementById('c1').innerText = text.length + "자";
+        document.getElementById('c2').innerText = text.replace(/\s/g, '').length + "자";
+        document.getElementById('c3').innerText = (text.trim() ? text.trim().split(/\s+/).length : 0) + "개";
+        document.getElementById('c4').innerText = text.split(/\n+/).filter(p => p.trim()).length + "개";
+        document.getElementById('c5').innerText = text.split(/[.!?]+/).filter(s => s.trim()).length + "개";
+    }
 
-        function analyzeText() {
-            const val = document.getElementById('counter-input').value;
-            document.getElementById('stat-char').innerText = val.length;
-            document.getElementById('stat-no-space').innerText = val.replace(/\s/g, '').length;
-            document.getElementById('stat-word').innerText = val.trim() === "" ? 0 : val.trim().split(/\s+/).length;
-        }
-
-        function cleanText(mode) {
-            let val = document.getElementById('regex-input').value;
-            if (mode === 'header-up') val = val.replace(/^(#{1,5})(?!#)/gm, (_, hashes) => hashes.slice(1) || '#');
-            if (mode === 'header') val = val.replace(/^#/gm, '##');
-            if (mode === 'list') val = val.replace(/^/gm, '* ');
-            if (mode === 'space') val = val.replace(/^\s*[\r\n]/gm, '');
-            document.getElementById('regex-output').value = val;
-        }
-
-        document.getElementById('img-input').onchange = (e) => {
-            const file = e.target.files[0];
-            if (!file) return;
-            const reader = new FileReader();
-            reader.onload = (ev) => {
-                const b64 = ev.target.result;
-                const label = `img_${Math.random().toString(36).substr(2, 5)}`;
-                document.getElementById('img-output-inline').value = `![${file.name}](${b64})`;
-                document.getElementById('img-output-ref-top').value = `![${file.name}][${label}]`;
-                document.getElementById('img-output-ref-bottom').value = `[${label}]: ${b64}`;
-                document.getElementById('img-results').style.display = 'block';
-            };
-            reader.readAsDataURL(file);
+    // --- 엑셀 로직 (기존 유지) ---
+    document.getElementById('xl-input').onchange = function(e) {
+        const file = e.target.files[0];
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const data = new Uint8Array(e.target.result);
+            const workbook = XLSX.read(data, {type: 'array'});
+            const firstSheet = workbook.SheetNames[0];
+            const json = XLSX.utils.sheet_to_json(workbook.Sheets[firstSheet], {header: 1});
+            if(json.length > 0) {
+                let md = "| " + json[0].join(" | ") + " |\n| " + json[0].map(()=>"---").join(" | ") + " |\n" +
+                         json.slice(1).map(row => "| " + row.join(" | ") + " |").join("\n");
+                document.getElementById('xl-res').innerHTML = `<textarea class="simple" rows="5" readonly>${md}</textarea>`;
+            }
         };
+        reader.readAsArrayBuffer(file);
+    };
+</script>
 
-        document.getElementById('excel-input').onchange = (e) => {
-            const file = e.target.files[0];
-            const reader = new FileReader();
-            reader.onload = (ev) => {
-                const workbook = XLSX.read(new Uint8Array(ev.target.result), {type: 'array'});
-                const res = document.getElementById('excel-results');
-                res.innerHTML = '';
-                workbook.SheetNames.forEach(name => {
-                    const json = XLSX.utils.sheet_to_json(workbook.Sheets[name], {header: 1});
-                    if(json.length > 0) {
-                        const clean = (v) => String(v || "").replace(/\|/g, "\\|");
-                        let md = "| " + json[0].map(clean).join(" | ") + " |\n| " + json[0].map(()=>"---").join(" | ") + " |\n" +
-                                   json.slice(1).map(row => "| " + row.map(clean).join(" | ") + " |").join("\n");
-                        const div = document.createElement('div');
-                        div.innerHTML = `<p style="margin-top:20px; font-weight:bold; color:var(--accent-color); font-size:12px;">Sheet: ${name}</p>
-                                         <textarea id="p-${name}" rows="5" readonly>${md}</textarea>
-                                         <button onclick="copyVal('p-${name}')">복사</button>`;
-                        res.appendChild(div);
-                    }
-                });
-            };
-            reader.readAsArrayBuffer(file);
-        };
-
-        function copyVal(id) {
-            const val = document.getElementById(id).value;
-            navigator.clipboard.writeText(val).then(() => {
-                const btn = event.target;
-                const oldText = btn.innerText;
-                btn.innerText = "복사됨!";
-                btn.style.background = "var(--success-color)";
-                setTimeout(() => { btn.innerText = oldText; btn.style.background = ""; }, 1200);
-            });
-        }
-    </script>
 </body>
 </html>
