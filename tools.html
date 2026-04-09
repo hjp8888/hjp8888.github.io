@@ -1,20 +1,25 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-    <script src="./xlsx.full.min.js"></script>
-    <script src="./marked.min.js"></script>
+    
+    <script src="./tools_js/xlsx.full.min.js"></script>
+    <script src="./tools_js/marked.min.js"></script>
+    <link href="./tools_js/prism-tomorrow.min.css" rel="stylesheet" />
+    <script src="./tools_js/prism.min.js"></script>
+    <script src="./tools_js/prism-python.min.js"></script>
+    <script src="./tools_js/prism-javascript.min.js"></script>
+    <script src="./tools_js/prism-c.min.js"></script>
+    <script src="./tools_js/prism-cpp.min.js"></script>
+    <script src="./tools_js/prism-markdown.min.js"></script>
+    
+    <!-- JSZip (MD→티들러 탭에서 ZIP 파싱용) -->
+    <script src="./tools_js/jszip.min.js"></script>
+
+
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Wiki Multi-Toolbox (Final v2)</title>
     
-    
-    <link href="./prism-tomorrow.min.css" rel="stylesheet" />
-    <script src="./prism.min.js"></script>
-    <script src="./prism-python.min.js"></script>
-    <script src="./prism-javascript.min.js"></script>
-    <script src="./prism-c.min.js"></script>
-    <script src="./prism-cpp.min.js"></script>
-    <script src="./prism-markdown.min.js"></script>
     
 
     <style>
@@ -56,31 +61,72 @@
         #wiki-navbar a:hover { background: rgba(255, 255, 255, 0.1); color: #fff; }
         #wiki-navbar a.current { color: #fff; font-weight: bold; background: rgba(255,255,255,0.12); }
 
-        /* [서브 Navbar] */
-        #sub-navbar {
-            position: fixed; top: 42px; left: 0; right: 0; z-index: 99998;
-            background: var(--subnav-bg); display: flex; align-items: center;
-            justify-content: center; height: 44px; backdrop-filter: blur(8px);
+        /* [햄버거 버튼] — navbar 왼쪽 바로 아래 */
+        #menu-btn {
+            position: fixed; top: 42px; left: 0; z-index: 100000;
+            width: 40px; height: 36px;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            gap: 5px; cursor: pointer; background: rgba(30,30,30,0.92);
+            border: none; border-bottom: 1px solid var(--border-color);
+            border-right: 1px solid var(--border-color);
+            border-radius: 0 0 8px 0;
+            padding: 0;
+        }
+        #menu-btn span {
+            display: block; width: 18px; height: 2px;
+            background: rgba(255,255,255,0.6); border-radius: 2px;
+            transition: 0.25s;
+        }
+        #menu-btn:hover span { background: #fff; }
+        #menu-btn.open span:nth-child(1) { transform: translateY(7px) rotate(45deg); }
+        #menu-btn.open span:nth-child(2) { opacity: 0; }
+        #menu-btn.open span:nth-child(3) { transform: translateY(-7px) rotate(-45deg); }
+
+        /* [드롭다운 메뉴] */
+        #tool-dropdown {
+            position: fixed; top: 78px; left: 0; z-index: 99998;
+            background: rgba(25, 25, 25, 0.97); backdrop-filter: blur(12px);
+            border-right: 1px solid var(--border-color);
             border-bottom: 1px solid var(--border-color);
-            overflow-x: auto; overflow-y: hidden; -webkit-overflow-scrolling: touch;
-            padding: 0 15px; box-sizing: border-box;
+            border-radius: 0 0 12px 0;
+            min-width: 180px;
+            box-shadow: 4px 4px 20px rgba(0,0,0,0.4);
+            overflow: hidden;
+            max-height: 0;
+            opacity: 0;
+            pointer-events: none;
+            transition: max-height 0.3s ease, opacity 0.2s ease;
         }
-        @media (max-width: 768px) { #sub-navbar { justify-content: flex-start; } }
-        #sub-navbar::-webkit-scrollbar { display: none; }
-        #sub-navbar { -ms-overflow-style: none; scrollbar-width: none; }
-
-        .nav-tab {
-            color: rgba(255, 255, 255, 0.5); font-size: 11px; cursor: pointer;
-            padding: 0 15px; height: 100%; display: flex; align-items: center;
-            transition: 0.2s; border-bottom: 2px solid transparent; flex-shrink: 0;
-            white-space: nowrap;
+        #tool-dropdown.open {
+            max-height: 500px;
+            opacity: 1;
+            pointer-events: auto;
         }
-        .nav-tab.active { color: var(--accent-color); border-bottom: 2px solid var(--accent-color); font-weight: bold; }
+        .dropdown-item {
+            display: flex; align-items: center;
+            padding: 11px 20px;
+            color: rgba(255,255,255,0.55);
+            font-size: 12px; cursor: pointer;
+            transition: 0.15s; white-space: nowrap;
+            border-bottom: 1px solid rgba(255,255,255,0.04);
+        }
+        .dropdown-item:last-child { border-bottom: none; }
+        .dropdown-item:hover { background: rgba(255,255,255,0.07); color: #fff; }
+        .dropdown-item.active {
+            color: var(--accent-color); font-weight: bold;
+            background: rgba(74,144,226,0.1);
+        }
+        .dropdown-item .dot {
+            width: 6px; height: 6px; border-radius: 50%;
+            background: var(--border-color); margin-right: 10px; flex-shrink: 0;
+            transition: 0.15s;
+        }
+        .dropdown-item.active .dot { background: var(--accent-color); }
 
-        /* 레이아웃 */
+        /* 레이아웃 — sub-navbar 없으므로 padding-top 줄임 */
         .tool-container {
             width: 73% !important; max-width: 1400px;
-            margin: 0 auto !important; padding-top: 115px; padding-bottom: 60px;
+            margin: 0 auto !important; padding-top: 70px; padding-bottom: 60px;
             box-sizing: border-box;
         }
 
@@ -131,7 +177,7 @@
 
         @media (max-width: 1024px) { .tool-container { width: 90% !important; } }
         @media (max-width: 480px) {
-            .tool-container { padding-top: 125px; width: 95% !important; }
+            .tool-container { padding-top: 70px; width: 95% !important; }
             .card { padding: 18px; }
         }
 
@@ -245,18 +291,25 @@
         <a href="tools.html" class="current">Tools</a>
     </nav>
 
-    <nav id="sub-navbar">
-        <div class="nav-tab active" onclick="showTool('excel')">마크다운 표</div>
-        <div class="nav-tab" onclick="showTool('image')">이미지 변환</div>
-        <div class="nav-tab" onclick="showTool('regex')">텍스트 청소</div>
-        <div class="nav-tab" onclick="showTool('counter')">글자수 분석</div>
-        <div class="nav-tab" onclick="showTool('html')">HTML 프리뷰</div>
-        <div class="nav-tab" onclick="showTool('md-preview')">마크다운 프리뷰</div>
-        <div class="nav-tab" onclick="showTool('code-editor')">코드 에디터</div>
-    </nav>
+    <!-- 햄버거 버튼 — navbar 왼쪽 아래 -->
+    <button id="menu-btn" onclick="toggleMenu()" aria-label="메뉴">
+        <span></span><span></span><span></span>
+    </button>
+
+    <!-- 드롭다운 메뉴 -->
+    <div id="tool-dropdown">
+        <div class="dropdown-item active" onclick="showTool('tiddler')"><span class="dot"></span>MD → 티들러</div>
+        <div class="dropdown-item" onclick="showTool('excel')"><span class="dot"></span>마크다운 표</div>
+        <div class="dropdown-item" onclick="showTool('image')"><span class="dot"></span>이미지 변환</div>
+        <div class="dropdown-item" onclick="showTool('regex')"><span class="dot"></span>텍스트 청소</div>
+        <div class="dropdown-item" onclick="showTool('counter')"><span class="dot"></span>글자수 분석</div>
+        <div class="dropdown-item" onclick="showTool('html')"><span class="dot"></span>HTML 프리뷰</div>
+        <div class="dropdown-item" onclick="showTool('md-preview')"><span class="dot"></span>마크다운 프리뷰</div>
+        <div class="dropdown-item" onclick="showTool('code-editor')"><span class="dot"></span>코드 에디터</div>
+    </div>
 
     <main class="tool-container">
-        <div id="tool-excel" class="tool-content active">
+        <div id="tool-excel" class="tool-content">
             <div class="card">
                 <div class="drop-zone" onclick="document.getElementById('excel-input').click()">
                     <h3 style="color:#fff; margin-top:0;">Excel ➔ Markdown Table</h3>
@@ -271,7 +324,7 @@
             <div class="card">
                 <div class="drop-zone" onclick="document.getElementById('img-input').click()">
                     <h3 style="color:#fff; margin-top:0;">Image ➔ Markdown Optimizer</h3>
-                    <p style="font-size:13px;">이미지를 마크다운 코드로 변환합니다 (BASE64)</p>
+                    <p style="font-size:13px;">이미지를 마크다운 코드로 변환합니다 (참조식 지원)</p>
                     <input type="file" id="img-input" hidden accept="image/*">
                 </div>
                 <div id="img-results" style="display: none;">
@@ -318,14 +371,60 @@
                     <button onclick="document.getElementById('counter-input').value=''; analyzeText();"
                         style="background:#e74c3c; padding:5px 12px; font-size:10px; margin:0;">초기화</button>
                 </div>
-                <textarea id="counter-input" rows="10"
-                    placeholder="분석할 텍스트를 입력하세요..."
-                    oninput="analyzeText()"
-                    style="margin-top:0;"></textarea>
+                <!-- 줄번호 + textarea 래퍼 -->
+                <div style="
+                    display: flex;
+                    border: 1px solid var(--border-color);
+                    border-radius: 8px;
+                    overflow: hidden;
+                    background: var(--input-bg);
+                    font-family: 'Fira Code', monospace;
+                    font-size: 13px;
+                    line-height: 1.6;
+                    margin-top: 0;
+                ">
+                    <!-- 줄번호 -->
+                    <div id="counter-line-numbers" style="
+                        min-width: 38px;
+                        padding: 12px 6px 12px 0;
+                        background: #1a1a1a;
+                        border-right: 1px solid #333;
+                        text-align: right;
+                        color: #555;
+                        font-size: 12px;
+                        line-height: 1.6;
+                        user-select: none;
+                        overflow: hidden;
+                        flex-shrink: 0;
+                        box-sizing: border-box;
+                    "><span style="padding-right:6px;">1</span></div>
+                    <!-- textarea -->
+                    <textarea id="counter-input"
+                        rows="10"
+                        placeholder="분석할 텍스트를 입력하세요..."
+                        oninput="analyzeText(); updateCounterLineNumbers();"
+                        onscroll="syncCounterScroll();"
+                        style="
+                            margin: 0;
+                            border: none;
+                            border-radius: 0;
+                            flex: 1;
+                            resize: vertical;
+                            font-family: 'Fira Code', monospace;
+                            font-size: 13px;
+                            line-height: 1.6;
+                            padding: 12px;
+                            background: transparent;
+                            color: var(--input-text);
+                            outline: none;
+                            white-space: pre;
+                            overflow: auto;
+                        "></textarea>
+                </div>
 
                 <div style="
                     display: grid;
-                    grid-template-columns: repeat(3, 1fr);
+                    grid-template-columns: repeat(5, 1fr);
                     gap: 10px;
                     margin-top: 16px;
                 ">
@@ -353,11 +452,6 @@
                         <div style="font-size:11px; color:#888; margin-bottom:4px;">단락 수</div>
                         <div id="stat-para" style="font-size:22px; font-weight:bold; color:#e74c3c; font-family:'Fira Code',monospace;">0</div>
                         <div style="font-size:10px; color:#555; margin-top:2px;">개</div>
-                    </div>
-                    <div style="background:rgba(26,188,156,0.1); border:1px solid rgba(26,188,156,0.25); border-radius:10px; padding:14px; text-align:center;">
-                        <div style="font-size:11px; color:#888; margin-bottom:4px;">줄 수</div>
-                        <div id="stat-line" style="font-size:22px; font-weight:bold; color:#1abc9c; font-family:'Fira Code',monospace;">0</div>
-                        <div style="font-size:10px; color:#555; margin-top:2px;">줄</div>
                     </div>
                 </div>
 
@@ -428,15 +522,119 @@
                 </div>
             </div>
         </div>
+
+        <!-- MD → 티들러 -->
+        <div id="tool-tiddler" class="tool-content active">
+            <div class="card">
+                <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:6px; margin-bottom:6px;">
+                    <h3 style="color:#fff; margin:0;">MD → 티들리위키 티들러</h3>
+                    <span style="font-size:11px; color:#555;">ZIP 업로드 → JSON 생성 → 티들리위키 Import</span>
+                </div>
+                <p style="font-size:12px; color:#888; margin:0 0 16px 0;">
+                    docs 폴더를 ZIP으로 압축해서 올리면 안의 모든 .md 파일을 티들러 JSON으로 변환합니다.
+                </p>
+
+                <!-- 드롭존 -->
+                <div id="tiddler-dropzone" class="drop-zone" onclick="document.getElementById('tiddler-input').click()"
+                    style="cursor:pointer;">
+                    <div style="font-size:32px; margin-bottom:8px;">📦</div>
+                    <h3 style="color:#fff; margin:0 0 6px 0;">ZIP 또는 .md 파일을 여기에 드래그하거나 클릭</h3>
+                    <p style="font-size:12px; margin:0; color:#777;">ZIP (docs 폴더 등 여러 파일) · 단일 .md 파일 모두 가능</p>
+                    <input type="file" id="tiddler-input" hidden accept=".zip,.md">
+                </div>
+
+                <!-- 로그 -->
+                <div id="tiddler-log" style="
+                    margin-top: 14px;
+                    background: #111;
+                    border: 1px solid #333;
+                    border-radius: 8px;
+                    padding: 12px;
+                    font-family: 'Fira Code', monospace;
+                    font-size: 12px;
+                    line-height: 1.8;
+                    min-height: 60px;
+                    max-height: 200px;
+                    overflow-y: auto;
+                    color: #aaa;
+                ">ZIP 파일을 올리면 여기에 변환 결과가 표시됩니다...</div>
+
+                <!-- 결과 영역 -->
+                <div id="tiddler-result-box" style="display:none; margin-top:16px;">
+
+                    <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px; margin-bottom:10px;">
+                        <span id="tiddler-count" style="font-size:13px; font-weight:bold; color:#2ecc71;"></span>
+                        <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                            <button onclick="downloadTiddlerJson()" style="background:#4a90e2; margin:0;">
+                                💾 JSON 다운로드
+                            </button>
+                            <button onclick="showImportGuide()" style="background:#f39c12; margin:0;">
+                                📖 Import 방법
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- JSON 미리보기 -->
+                    <textarea id="tiddler-preview" rows="8" readonly
+                        style="font-size:11px; color:#888; background:#111;"></textarea>
+
+                    <!-- Import 가이드 -->
+                    <div id="tiddler-guide" style="
+                        display:none; margin-top:14px;
+                        background: rgba(74,144,226,0.08);
+                        border: 1px solid rgba(74,144,226,0.3);
+                        border-radius:10px; padding:16px;
+                        font-size:12px; line-height:2; color:#ccc;
+                    ">
+                        <div style="font-weight:bold; color:#4a90e2; margin-bottom:8px;">📥 티들리위키에 Import하는 방법</div>
+                        <div>1. 위에서 <strong style="color:#2ecc71;">JSON 다운로드</strong> 버튼 클릭</div>
+                        <div>2. 티들리위키(index.html 등) 브라우저에서 열기</div>
+                        <div>3. 우측 상단 <strong style="color:#fff;">≡ 메뉴</strong> → <strong style="color:#fff;">Import</strong> 클릭</div>
+                        <div>4. 다운받은 <strong style="color:#f39c12;">.json 파일</strong> 선택</div>
+                        <div>5. 티들러 목록 확인 후 <strong style="color:#2ecc71;">Import all</strong> 클릭</div>
+                        <div style="margin-top:8px; color:#666; font-size:11px;">
+                            * frontmatter의 title, tags가 자동으로 적용됩니다.<br>
+                            * title이 없으면 파일명이 title로 사용됩니다.
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
     </main>
 
     <script>
-        function showTool(toolId) {
-            document.querySelectorAll('.tool-content').forEach(el => el.classList.remove('active'));
-            document.querySelectorAll('.nav-tab').forEach(el => el.classList.remove('active'));
-            document.getElementById('tool-' + toolId).classList.add('active');
-            event.currentTarget.classList.add('active');
+        function toggleMenu() {
+            document.getElementById('menu-btn').classList.toggle('open');
+            document.getElementById('tool-dropdown').classList.toggle('open');
         }
+
+        function showTool(toolId) {
+            // 콘텐츠 전환
+            document.querySelectorAll('.tool-content').forEach(el => el.classList.remove('active'));
+            document.getElementById('tool-' + toolId).classList.add('active');
+            // 드롭다운 active 표시
+            document.querySelectorAll('.dropdown-item').forEach(el => el.classList.remove('active'));
+            event.currentTarget.classList.add('active');
+            // 드롭다운 닫기
+            document.getElementById('menu-btn').classList.remove('open');
+            document.getElementById('tool-dropdown').classList.remove('open');
+        }
+
+        // 드롭다운 외부 클릭 시 닫기
+        document.addEventListener('click', function(e) {
+            const btn = document.getElementById('menu-btn');
+            const drop = document.getElementById('tool-dropdown');
+            if (!btn.contains(e.target) && !drop.contains(e.target)) {
+                btn.classList.remove('open');
+                drop.classList.remove('open');
+            }
+        });
+
+        // 초기 화면: 무조건 MD → 티들러 표시
+        document.querySelectorAll('.tool-content').forEach(el => el.classList.remove('active'));
+        document.getElementById('tool-tiddler').classList.add('active');
+        document.querySelectorAll('.dropdown-item').forEach(el => el.classList.remove('active'));
+        document.querySelector('.dropdown-item[onclick*="tiddler"]').classList.add('active');
 
         // 프리뷰 로직
         function renderHTML() {
@@ -455,20 +653,35 @@
             const wordCount   = val.trim() === '' ? 0 : val.trim().split(/\s+/).length;
             const sentences   = val.trim() === '' ? 0 : val.split(/[.!?。！？]+/).filter(s => s.trim()).length;
             const paragraphs  = val.trim() === '' ? 0 : val.split(/\n{2,}/).filter(p => p.trim()).length || (val.trim() ? 1 : 0);
-            const lines       = val === '' ? 0 : val.split('\n').length;
 
             document.getElementById('stat-char').innerText     = withSpace.toLocaleString();
             document.getElementById('stat-no-space').innerText = noSpace.toLocaleString();
             document.getElementById('stat-word').innerText     = wordCount.toLocaleString();
             document.getElementById('stat-sentence').innerText = sentences.toLocaleString();
             document.getElementById('stat-para').innerText     = paragraphs.toLocaleString();
-            document.getElementById('stat-line').innerText     = lines.toLocaleString();
 
             // 바 시각화
             const spaceCount = withSpace - noSpace;
             const ratio = withSpace > 0 ? Math.round((noSpace / withSpace) * 100) : 100;
             document.getElementById('stat-bar').style.width = ratio + '%';
             document.getElementById('stat-bar-label').innerText = `공백 ${spaceCount.toLocaleString()}자 (전체의 ${100 - ratio}%)`;
+        }
+
+        function updateCounterLineNumbers() {
+            const ta = document.getElementById('counter-input');
+            const lineCount = ta.value === '' ? 1 : ta.value.split('\n').length;
+            const container = document.getElementById('counter-line-numbers');
+            let html = '';
+            for (let i = 1; i <= lineCount; i++) {
+                html += `<span style="display:block; padding-right:6px;">${i}</span>`;
+            }
+            container.innerHTML = html;
+        }
+
+        function syncCounterScroll() {
+            const ta = document.getElementById('counter-input');
+            const ln = document.getElementById('counter-line-numbers');
+            ln.scrollTop = ta.scrollTop;
         }
 
         function cleanText(mode) {
@@ -633,6 +846,226 @@
 
         // 초기 줄번호
         updateLineNumbers();
+    </script>
+
+    <!-- ── MD → 티들러 탭 스크립트 ── -->
+    <script>
+    (function() {
+
+        // ── 파일 드롭/클릭 이벤트 ──
+        function initTiddler() {
+            const dropZone = document.getElementById('tiddler-dropzone');
+            const fileInput = document.getElementById('tiddler-input');
+
+            dropZone.addEventListener('dragover', e => {
+                e.preventDefault();
+                dropZone.style.borderColor = '#4a90e2';
+                dropZone.style.background = 'rgba(74,144,226,0.08)';
+            });
+            dropZone.addEventListener('dragleave', () => {
+                dropZone.style.borderColor = '';
+                dropZone.style.background = '';
+            });
+            dropZone.addEventListener('drop', e => {
+                e.preventDefault();
+                dropZone.style.borderColor = '';
+                dropZone.style.background = '';
+                const file = e.dataTransfer.files[0];
+                if (file) processFile(file);
+            });
+            fileInput.addEventListener('change', e => {
+                if (e.target.files[0]) processFile(e.target.files[0]);
+            });
+        }
+
+        // ── 파일 종류 분기 ──
+        function processFile(file) {
+            if (file.name.endsWith('.zip')) {
+                processZip(file);
+            } else if (file.name.endsWith('.md')) {
+                processMd(file);
+            } else {
+                const log = document.getElementById('tiddler-log');
+                log.innerHTML = '<div style="color:#e74c3c">❌ .zip 또는 .md 파일만 지원합니다.</div>';
+            }
+        }
+
+        // ── frontmatter 파싱 ──
+        function parseFrontmatter(raw) {
+            let title = '', tags = '', text = raw;
+            const fm = raw.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/);
+            if (fm) {
+                const header = fm[1];
+                text = fm[2];
+                const tMatch = header.match(/^title\s*:\s*["']?(.+?)["']?\s*$/m);
+                const gMatch = header.match(/^tags\s*:\s*["']?(.+?)["']?\s*$/m);
+                if (tMatch) title = tMatch[1].trim();
+                if (gMatch) tags = gMatch[1].trim();
+            }
+            return { title, tags, text: text.trim() };
+        }
+
+        // ── 단일 .md 파일 처리 ──
+        async function processMd(file) {
+            const log = document.getElementById('tiddler-log');
+            const resultBox = document.getElementById('tiddler-result-box');
+            const countEl = document.getElementById('tiddler-count');
+
+            log.innerHTML = '';
+            resultBox.style.display = 'none';
+
+            function addLog(msg, color) {
+                log.innerHTML += `<div style="color:${color || '#aaa'}">${msg}</div>`;
+            }
+
+            const raw = await file.text();
+            let { title, tags, text } = parseFrontmatter(raw);
+            if (!title) title = file.name.replace(/\.md$/, '');
+
+            const now = new Date().toISOString().replace(/[-:T.]/g, '').slice(0, 17) + '000';
+            const tiddlers = [{
+                title, tags, text,
+                created: now, modified: now,
+                type: 'text/x-markdown'
+            }];
+
+            addLog(`📄 단일 .md 파일 처리`, '#4a90e2');
+            addLog(`✓ ${title}${tags ? ` <span style="color:#555">[${tags}]</span>` : ''}`, '#2ecc71');
+
+            const jsonStr = JSON.stringify(tiddlers, null, 2);
+            window._tiddlerJson = jsonStr;
+
+            countEl.textContent = `1개 티들러 생성 완료`;
+            resultBox.style.display = 'block';
+            addLog(`\n✅ 변환 완료!`, '#f39c12');
+            document.getElementById('tiddler-preview').value = jsonStr;
+        }
+
+        // ── ZIP 처리 ──
+        async function processZip(file) {
+            const log = document.getElementById('tiddler-log');
+            const resultBox = document.getElementById('tiddler-result-box');
+            const dlBtn = document.getElementById('tiddler-dl-btn');
+            const importBtn = document.getElementById('tiddler-import-btn');
+            const countEl = document.getElementById('tiddler-count');
+
+            log.innerHTML = '';
+            resultBox.style.display = 'none';
+
+            function addLog(msg, color) {
+                log.innerHTML += `<div style="color:${color || '#aaa'}">${msg}</div>`;
+            }
+
+            let zip;
+            try {
+                // EUC-KR 인코딩 파일명 대응: decodeFileName 커스텀
+                // JSZip이 CP437로 읽은 바이트를 EUC-KR로 재디코딩
+                const decodeFileName = (bytes) => {
+                    try {
+                        // UTF-8 flag가 없으면 EUC-KR 시도
+                        return new TextDecoder('euc-kr').decode(bytes);
+                    } catch(e) {
+                        return new TextDecoder('utf-8').decode(bytes);
+                    }
+                };
+                zip = await JSZip.loadAsync(file, { decodeFileName });
+            } catch(e) {
+                addLog('❌ ZIP 파일을 읽을 수 없습니다.', '#e74c3c');
+                return;
+            }
+
+            const now = new Date().toISOString().replace(/[-:T.]/g, '').slice(0, 17) + '000';
+            const tiddlers = [];
+            const files = [];
+
+            zip.forEach((path, entry) => {
+                if (entry.dir) return;
+                // .md 체크: 경로 끝 3글자가 .md인지 바이트 수준으로 확인
+                // 한글 경로가 깨져도 .md는 ASCII라 항상 정확히 잡힘
+                const lower = path.toLowerCase();
+                if (lower.endsWith('.md')) {
+                    files.push({ path, entry });
+                }
+            });
+
+            if (files.length === 0) {
+                addLog('❌ ZIP 안에 .md 파일이 없습니다.', '#e74c3c');
+                return;
+            }
+
+            addLog(`📦 ZIP 안에서 .md 파일 ${files.length}개 발견`, '#4a90e2');
+
+            for (const { path, entry } of files) {
+                // 내용은 UTF-8로 명시적으로 읽기
+                const rawBytes = await entry.async('uint8array');
+                const raw = new TextDecoder('utf-8').decode(rawBytes);
+                let { title, tags, text } = parseFrontmatter(raw);
+
+                // title 없으면 파일명에서 추출
+                // 윈도우 ZIP은 파일명이 CP437로 깨져있으므로 TextDecoder로 복원 시도
+                if (!title) {
+                    let fname = path.split('/').pop().replace(/\.md$/i, '');
+                    try {
+                        // CP437 바이트로 재해석 후 EUC-KR로 디코딩
+                        const bytes = new Uint8Array([...fname].map(c => c.charCodeAt(0) & 0xff));
+                        const decoded = new TextDecoder('euc-kr').decode(bytes);
+                        // 디코딩 결과가 깨지지 않았으면 사용
+                        if (!/[^\u0000-\u007F\uAC00-\uD7A3\u3040-\u30FF\u4E00-\u9FFF\w\-_.() ]/u.test(decoded)) {
+                            fname = decoded;
+                        }
+                    } catch(e) { /* 디코딩 실패 시 원본 사용 */ }
+                    title = fname;
+                }
+
+                tiddlers.push({
+                    title,
+                    tags,
+                    text,
+                    created: now,
+                    modified: now,
+                    type: 'text/x-markdown'
+                });
+
+                addLog(`✓ ${title}${tags ? ` <span style="color:#555">[${tags}]</span>` : ''}`, '#2ecc71');
+            }
+
+            // JSON 직렬화 (티들리위키 import 형식)
+            const jsonStr = JSON.stringify(tiddlers, null, 2);
+            window._tiddlerJson = jsonStr;
+            window._tiddlerCount = tiddlers.length;
+
+            countEl.textContent = `${tiddlers.length}개 티들러 생성 완료`;
+            resultBox.style.display = 'block';
+            addLog(`\n✅ 총 ${tiddlers.length}개 티들러 변환 완료!`, '#f39c12');
+
+            // 미리보기
+            document.getElementById('tiddler-preview').value = jsonStr.slice(0, 2000) + (jsonStr.length > 2000 ? '\n\n...(생략)' : '');
+        }
+
+        // ── JSON 다운로드 ──
+        window.downloadTiddlerJson = function() {
+            if (!window._tiddlerJson) return;
+            const blob = new Blob([window._tiddlerJson], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `tiddlers_${Date.now()}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+        };
+
+        // ── 티들리위키 import 방법 안내 ──
+        window.showImportGuide = function() {
+            document.getElementById('tiddler-guide').style.display =
+                document.getElementById('tiddler-guide').style.display === 'none' ? 'block' : 'none';
+        };
+
+        // DOM 준비 후 초기화
+        document.addEventListener('DOMContentLoaded', initTiddler);
+        // 혹시 DOMContentLoaded가 이미 지난 경우
+        if (document.readyState !== 'loading') initTiddler();
+
+    })();
     </script>
 </body>
 </html>
