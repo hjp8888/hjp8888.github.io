@@ -299,6 +299,7 @@
     <!-- 드롭다운 메뉴 -->
     <div id="tool-dropdown">
         <div class="dropdown-item active" onclick="showTool('tiddler')"><span class="dot"></span>MD → 티들러</div>
+        <div class="dropdown-item" onclick="showTool('tiddler-export')"><span class="dot"></span>티들러 → MD</div>
         <div class="dropdown-item" onclick="showTool('excel')"><span class="dot"></span>마크다운 표</div>
         <div class="dropdown-item" onclick="showTool('image')"><span class="dot"></span>이미지 변환</div>
         <div class="dropdown-item" onclick="showTool('regex')"><span class="dot"></span>텍스트 청소</div>
@@ -597,6 +598,42 @@
                             * title이 없으면 파일명이 title로 사용됩니다.
                         </div>
                     </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 티들러 → MD -->
+        <div id="tool-tiddler-export" class="tool-content">
+            <div class="card">
+                <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:6px; margin-bottom:6px;">
+                    <h3 style="color:#fff; margin:0;">티들러 → MD 파일</h3>
+                    <span style="font-size:11px; color:#555;">JSON 업로드 → .md 추출</span>
+                </div>
+                <p style="font-size:12px; color:#888; margin:0 0 16px 0;">
+                    티들리위키에서 Export한 JSON을 올리면 티들러마다 .md 파일로 변환합니다.<br>
+                    티들러 1개면 단일 .md로, 2개 이상이면 ZIP으로 다운로드됩니다.
+                </p>
+
+                <div id="te-dropzone" class="drop-zone" onclick="document.getElementById('te-input').click()" style="cursor:pointer;">
+                    <div style="font-size:32px; margin-bottom:8px;">📄</div>
+                    <h3 style="color:#fff; margin:0 0 6px 0;">JSON 파일을 여기에 드래그하거나 클릭</h3>
+                    <p style="font-size:12px; margin:0; color:#777;">티들리위키 Export JSON (.json)</p>
+                    <input type="file" id="te-input" hidden accept=".json">
+                </div>
+
+                <div id="te-log" style="
+                    margin-top:14px; background:#111; border:1px solid #333;
+                    border-radius:8px; padding:12px; font-family:'Fira Code',monospace;
+                    font-size:12px; line-height:1.8; min-height:60px; max-height:200px;
+                    overflow-y:auto; color:#aaa;
+                ">JSON 파일을 올리면 여기에 변환 결과가 표시됩니다...</div>
+
+                <div id="te-result-box" style="display:none; margin-top:16px;">
+                    <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px; margin-bottom:10px;">
+                        <span id="te-count" style="font-size:13px; font-weight:bold; color:#2ecc71;"></span>
+                        <button id="te-dl-btn" onclick="downloadTiddlerMd()" style="background:#4a90e2; margin:0;">💾 다운로드</button>
+                    </div>
+                    <textarea id="te-preview" rows="8" readonly style="font-size:11px; color:#888; background:#111; margin-top:0;"></textarea>
                 </div>
             </div>
         </div>
@@ -1064,6 +1101,128 @@
         document.addEventListener('DOMContentLoaded', initTiddler);
         // 혹시 DOMContentLoaded가 이미 지난 경우
         if (document.readyState !== 'loading') initTiddler();
+
+    })();
+    </script>
+
+    <!-- ── 티들러 → MD 스크립트 ── -->
+    <script>
+    (function() {
+
+        function initTiddlerExport() {
+            const dropZone = document.getElementById('te-dropzone');
+            const fileInput = document.getElementById('te-input');
+
+            dropZone.addEventListener('dragover', e => {
+                e.preventDefault();
+                dropZone.style.borderColor = '#4a90e2';
+                dropZone.style.background = 'rgba(74,144,226,0.08)';
+            });
+            dropZone.addEventListener('dragleave', () => {
+                dropZone.style.borderColor = '';
+                dropZone.style.background = '';
+            });
+            dropZone.addEventListener('drop', e => {
+                e.preventDefault();
+                dropZone.style.borderColor = '';
+                dropZone.style.background = '';
+                const file = e.dataTransfer.files[0];
+                if (file) processJson(file);
+            });
+            fileInput.addEventListener('change', e => {
+                if (e.target.files[0]) processJson(e.target.files[0]);
+                e.target.value = '';
+            });
+        }
+
+        async function processJson(file) {
+            const log       = document.getElementById('te-log');
+            const resultBox = document.getElementById('te-result-box');
+            const countEl   = document.getElementById('te-count');
+            const preview   = document.getElementById('te-preview');
+            const dlBtn     = document.getElementById('te-dl-btn');
+
+            log.innerHTML = '';
+            resultBox.style.display = 'none';
+            window._teMdFiles = [];
+
+            function addLog(msg, color) {
+                log.innerHTML += `<div style="color:${color || '#aaa'}">${msg}</div>`;
+            }
+
+            // JSON 파싱
+            let tiddlers;
+            try {
+                const raw = await file.text();
+                tiddlers = JSON.parse(raw);
+                if (!Array.isArray(tiddlers)) tiddlers = [tiddlers];
+            } catch(e) {
+                addLog('❌ JSON 파일을 읽을 수 없습니다.', '#e74c3c');
+                return;
+            }
+
+            // $:/ 시스템 티들러 제외
+            const filtered = tiddlers.filter(t => t.title && !t.title.startsWith('$:/'));
+
+            if (filtered.length === 0) {
+                addLog('❌ 변환할 티들러가 없습니다. (시스템 티들러는 제외됩니다)', '#e74c3c');
+                return;
+            }
+
+            addLog(`📄 티들러 ${filtered.length}개 발견 (시스템 ${tiddlers.length - filtered.length}개 제외)`, '#4a90e2');
+
+            const mdFiles = [];
+            for (const t of filtered) {
+                const title   = t.title || 'untitled';
+                const tags    = t.tags  || '';
+                const text    = t.text  || '';
+                const fm      = `---\ntitle: "${title.replace(/"/g, '\\"')}"\ntags: "${tags}"\n---\n\n`;
+                const content = fm + text;
+                const safeName = title.replace(/[\\/:*?"<>|]/g, '_') + '.md';
+                mdFiles.push({ name: safeName, content });
+                addLog(`✓ ${title}${tags ? ` <span style="color:#555">[${tags}]</span>` : ''}`, '#2ecc71');
+            }
+
+            window._teMdFiles = mdFiles;
+
+            // 버튼 라벨
+            dlBtn.textContent = mdFiles.length === 1
+                ? `💾 ${mdFiles[0].name} 다운로드`
+                : `💾 ZIP 다운로드 (${mdFiles.length}개)`;
+
+            // 미리보기 (첫 번째 파일)
+            preview.value = mdFiles[0].content.slice(0, 1500) + (mdFiles[0].content.length > 1500 ? '\n\n...(생략)' : '');
+
+            countEl.textContent = `${mdFiles.length}개 티들러 변환 완료`;
+            resultBox.style.display = 'block';
+            addLog(`\n✅ 변환 완료!`, '#f39c12');
+        }
+
+        window.downloadTiddlerMd = async function() {
+            const files = window._teMdFiles;
+            if (!files || files.length === 0) return;
+
+            if (files.length === 1) {
+                // 단일 .md
+                const blob = new Blob([files[0].content], { type: 'text/plain' });
+                const url  = URL.createObjectURL(blob);
+                const a    = document.createElement('a');
+                a.href = url; a.download = files[0].name; a.click();
+                URL.revokeObjectURL(url);
+            } else {
+                // ZIP
+                const zip = new JSZip();
+                for (const f of files) zip.file(f.name, f.content);
+                const blob = await zip.generateAsync({ type: 'blob' });
+                const url  = URL.createObjectURL(blob);
+                const a    = document.createElement('a');
+                a.href = url; a.download = `tiddlers_md_${Date.now()}.zip`; a.click();
+                URL.revokeObjectURL(url);
+            }
+        };
+
+        document.addEventListener('DOMContentLoaded', initTiddlerExport);
+        if (document.readyState !== 'loading') initTiddlerExport();
 
     })();
     </script>
