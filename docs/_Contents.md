@@ -34,3 +34,4 @@ LAST UPDATE: 2026.04
 ## 🗺️ Tutorial
 
 - [티들리위키 사용법](#사용법)
+- [📚README](#README)
