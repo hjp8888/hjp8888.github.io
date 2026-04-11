@@ -1,6 +1,6 @@
 ---
 title: "_Contents"
-tags: "main 1"
+tags: "main"
 ---
 # 🗃️ Project Archive
 
