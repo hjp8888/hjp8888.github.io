@@ -296,16 +296,16 @@
         <span></span><span></span><span></span>
     </button>
 
-    <!-- 드롭다운 메뉴 -->
+    <!-- 드롭다운 메뉴, 순서 변경 가능 --> 
     <div id="tool-dropdown">
         <div class="dropdown-item active" onclick="showTool('tiddler')"><span class="dot"></span>MD → 티들러</div>
         <div class="dropdown-item" onclick="showTool('tiddler-export')"><span class="dot"></span>티들러 → MD</div>
+        <div class="dropdown-item" onclick="showTool('md-preview')"><span class="dot"></span>마크다운 프리뷰</div>
         <div class="dropdown-item" onclick="showTool('excel')"><span class="dot"></span>마크다운 표</div>
         <div class="dropdown-item" onclick="showTool('image')"><span class="dot"></span>이미지 변환</div>
         <div class="dropdown-item" onclick="showTool('regex')"><span class="dot"></span>텍스트 청소</div>
         <div class="dropdown-item" onclick="showTool('counter')"><span class="dot"></span>글자수 분석</div>
         <div class="dropdown-item" onclick="showTool('html')"><span class="dot"></span>HTML 프리뷰</div>
-        <div class="dropdown-item" onclick="showTool('md-preview')"><span class="dot"></span>마크다운 프리뷰</div>
         <div class="dropdown-item" onclick="showTool('code-editor')"><span class="dot"></span>코드 에디터</div>
     </div>
 
@@ -655,8 +655,18 @@
             // 드롭다운 닫기
             document.getElementById('menu-btn').classList.remove('open');
             document.getElementById('tool-dropdown').classList.remove('open');
-        }
 
+            // 마크다운 프리뷰 탭 열릴 때 비어있으면 템플릿 자동 삽입
+            if (toolId === 'md-preview') {
+                const ta = document.getElementById('md-preview-input');
+                if (!ta.value.trim()) {
+                    ta.value = '---\ntitle: ""\ntags: ""\n---\n\n';
+                }
+            }
+        }
+      
+        
+        
         // 드롭다운 외부 클릭 시 닫기
         document.addEventListener('click', function(e) {
             const btn = document.getElementById('menu-btn');
