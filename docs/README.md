@@ -105,7 +105,6 @@ tags: "태그명"
 
 티들리위키 마크다운에서 코드 블록에 언어명을 지정하면 신택스 하이라이팅이 적용돼요.
 
-````markdown
 ```javascript
 (function(a,b){
     var result = a+b;
@@ -127,7 +126,6 @@ class Singleton:
             raise Singleton.__single
         Singleton.__single = self
 ```
-````
 
 지원 언어: `javascript` `css` `python` `perl` `html` `bash` `json` 등
 
