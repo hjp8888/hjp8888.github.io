@@ -97,6 +97,103 @@ tags: "태그명"
 <a href="//google.com/search?q=검색어+띄어쓰기" target=_blank>g</a>
 ```
 
+### 코드 하이라이터
+
+티들리위키 마크다운에서 코드 블록에 언어명을 지정하면 신택스 하이라이팅이 적용돼요.
+
+````markdown
+```javascript
+(function(a,b){
+    var result = a+b;
+    return result;
+})(10,20)
+```
+
+```css
+* { margin: 0; padding: 0; }
+html { font-size: 62.5%; }
+body { font-size: 14px; }
+```
+
+```python
+class Singleton:
+    __single = None
+    def __init__( self ):
+        if Singleton.__single:
+            raise Singleton.__single
+        Singleton.__single = self
+```
+````
+
+지원 언어: `javascript` `css` `python` `perl` `html` `bash` `json` 등
+
+---
+
+## 🖼️ 이미지 · 파일 삽입
+
+레포 루트에 `img/` 폴더를 만들고 파일을 넣으면 마크다운에서 바로 참조할 수 있어요.
+
+### 이미지
+
+```markdown
+![대체텍스트](./img/photo.jpg)
+```
+
+지원 형식: `jpg` `png` `gif` `webp` `svg`
+
+크기 조절이 필요하면 HTML을 직접 써요.
+
+```html
+<!-- 픽셀 지정 -->
+<img src="./img/photo.jpg" width="300">
+
+<!-- 비율 지정 -->
+<img src="./img/photo.jpg" style="width:50%">
+
+<!-- 최대 너비 (반응형) -->
+<img src="./img/photo.jpg" style="max-width:400px; height:auto">
+```
+
+### 영상 · 오디오
+
+```markdown
+![](./img/video.mp4)
+![](./img/audio.mp3)
+```
+
+### PDF
+
+`![]()` 문법으로는 PDF가 표시되지 않아요. 아래 방법을 사용해요.
+
+```html
+<!-- 인라인 뷰어 (브라우저에서 바로 표시) -->
+<iframe src="./img/document.pdf" width="100%" height="600px"></iframe>
+```
+
+### 다운로드 링크
+
+```markdown
+[파일명](./img/document.pdf)
+```
+
+클릭하면 브라우저 기본 동작 (PDF는 열기, 나머지는 다운로드)
+
+강제 다운로드가 필요하면 HTML을 써요.
+
+```html
+<a href="./img/document.pdf" download>PDF 다운로드</a>
+<a href="./img/file.zip" download>ZIP 다운로드</a>
+```
+
+### 정리
+
+| 파일 종류 | 삽입 방법 | 크기 조절 |
+|----------|----------|----------|
+| 이미지 (jpg, png 등) | `![](./img/파일)` | `<img width="">` |
+| 영상 · 오디오 | `![](./img/파일)` | - |
+| PDF 뷰어 | `<iframe src="">` | height 속성으로 조절 |
+| 다운로드 링크 | `[이름](./img/파일)` 또는 `<a download>` | - |
+
 ---
 
 ## ⚙️ 빌드 동작 방식
