@@ -1,4 +1,4 @@
-import json, os, glob, re, shutil
+import json, os, glob, re, shutil, zipfile, tempfile
 from datetime import datetime
 
 # ── 설정 ──────────────────────────────
@@ -101,14 +101,46 @@ for html_file, docs_folder in FILES.items():
 
     os.makedirs(docs_folder, exist_ok=True)
 
+    # ── ZIP 파일 자동 인식 및 압축 해제 ──
+    # docs 폴더 안에 .zip 파일이 있으면 임시 폴더에 풀어서 md 파일 수집
+    zip_files = glob.glob(os.path.join(docs_folder, '*.zip'))
+    tmp_dirs = []  # 나중에 정리할 임시 폴더 목록
+
+    for zip_path in zip_files:
+        tmp_dir = tempfile.mkdtemp()
+        tmp_dirs.append(tmp_dir)
+        print(f"  📦 ZIP 발견: {os.path.basename(zip_path)} → 임시 압축 해제 중...")
+        try:
+            with zipfile.ZipFile(zip_path, 'r') as z:
+                # 한글 파일명 EUC-KR 대응
+                def decode_name(name):
+                    try:
+                        return name.encode('cp437').decode('euc-kr')
+                    except:
+                        return name
+
+                for info in z.infolist():
+                    fname = decode_name(info.filename)
+                    target = os.path.join(tmp_dir, fname)
+                    if info.is_dir():
+                        os.makedirs(target, exist_ok=True)
+                    else:
+                        os.makedirs(os.path.dirname(target), exist_ok=True)
+                        with z.open(info) as src, open(target, 'wb') as dst:
+                            dst.write(src.read())
+        except Exception as e:
+            print(f"  ⚠ ZIP 오류: {e}")
+
+    # docs의 모든 .md 파일 수집 (일반 파일 + ZIP 압축 해제 파일)
+    md_files = sorted(glob.glob(os.path.join(docs_folder, '**/*.md'), recursive=True))
+    for tmp_dir in tmp_dirs:
+        md_files += sorted(glob.glob(os.path.join(tmp_dir, '**/*.md'), recursive=True))
+
     with open(html_file, 'r', encoding='utf-8') as f:
         html = f.read()
 
     tiddlers, si, ep = get_store(html)
     result_json = html[si:ep]
-
-    # docs의 모든 .md 파일 수집
-    md_files = sorted(glob.glob(os.path.join(docs_folder, '**/*.md'), recursive=True))
 
     # md 파일에서 title 목록 수집
     md_titles = {}
@@ -161,6 +193,10 @@ for html_file, docs_folder in FILES.items():
     json.loads(result_json)
     with open(html_file, 'w', encoding='utf-8') as f:
         f.write(html[:si] + result_json + html[ep:])
+
+    # 임시 폴더 정리
+    for tmp_dir in tmp_dirs:
+        shutil.rmtree(tmp_dir, ignore_errors=True)
 
     print(f"  → 추가 {count['추가']}개 / 수정 {count['수정']}개\n")
     total_add += count['추가']
