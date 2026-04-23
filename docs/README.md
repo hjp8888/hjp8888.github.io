@@ -58,8 +58,10 @@ hjp8888.github.io/
 │   docs 폴더 구조 예시
 │   docs/
 │   ├── 파일.md              ← 태그 없음 (루트에 바로 넣기)
+│   ├── 파일.html            ← 태그 없음 (루트에 바로 넣기)
 │   └── 하위폴더/
-│       └── 파일.md          ← 태그: 하위폴더명
+│       ├── 파일.md          ← 태그: 하위폴더명
+│       └── 파일.html        ← 태그: 하위폴더명 (자동 추출)
 │
 ├── img/                ← 이미지 파일
 ├── .github/
@@ -128,6 +130,33 @@ class Singleton:
 ```
 
 지원 언어: `javascript` `css` `python` `perl` `html` `bash` `json` 등
+
+---
+
+## 🌐 HTML 파일 지원
+
+`.md` 파일 외에 `.html` 파일도 docs 폴더에 넣으면 티들러로 자동 삽입돼요.
+
+### HTML 파일 규칙
+
+- **title** — 파일명 (확장자 제외). 프론트매터 없음
+- **tags** — 상위 폴더명에서 자동 추출. docs/docs2~docs5 자체는 태그 제외
+- **type** — `text/html` 로 삽입됨
+
+```
+docs/124.html              → title: "124",    tags: ""
+docs/여행/부산/해운대.html  → title: "해운대",  tags: "여행 부산"
+docs/1/2/279.html          → title: "279",    tags: "1 2"
+```
+
+### md vs html 우선순위
+
+같은 title의 `.md`와 `.html`이 동시에 있으면 **`.html`이 무조건 덮어씀**
+
+```
+docs/서울.md    ← 이게 있어도
+docs/서울.html  ← 이게 우선! title·내용·태그 모두 html 기준
+```
 
 ---
 
@@ -203,8 +232,10 @@ class Singleton:
 ```
 build.py 실행
  ├── 1. backup/ 자동 생성 (없으면) 후 타임스탬프로 html 백업 (파일당 최대 2개)
- ├── 2. docs~docs5 의 모든 .md 파일 탐색 (하위폴더 포함)
- │       ├── 프론트매터 title/tags 파싱
+ ├── 2. docs~docs5 의 모든 .md / .html 파일 탐색 (하위폴더 포함)
+ │       ├── .md  → 프론트매터 title/tags 파싱, type: text/markdown
+ │       ├── .html → 파일명이 title, 폴더명이 tags, type: text/html
+ │       ├── 같은 title이면 .html이 .md를 덮어씀
  │       └── 해당 html에 티들러 방식으로 삽입
  │           ├── 같은 제목 티들러 있으면 → 내용 수정
  │           └── 없으면 → 새 티들러 추가
@@ -219,7 +250,7 @@ build.py 실행
 
 ### VSCode Web (github.dev) — 주요 사용 방법
 
-1. `docs/` 폴더에 `.md` 파일 작성 또는 수정
+1. `docs/` 폴더에 `.md` 또는 `.html` 파일 작성 또는 수정
 2. 소스 컨트롤(`Ctrl+Shift+G`) → 커밋 & 푸시
 3. GitHub Actions 자동 실행 → html 업데이트 → Pages 배포
 4. `https://hjp8888.github.io` 에서 확인
@@ -264,4 +295,6 @@ git push
   - 로컬에서 직접 수정 시 `Ctrl+S` 수동 저장 필요
 - `backup/` 은 파일당 최대 2개 유지. GitHub git 히스토리가 실질적 백업
 - 같은 `title` 의 md 파일이 여러 개면 마지막으로 읽힌 파일로 덮어써짐
+- 같은 title의 `.md`와 `.html`이 있으면 `.html`이 우선
 - docs/ 폴더만 삭제해도 다음 빌드 때 html에서 다시 내보내지므로 초기화 시 html도 함께 교체 필요
+
