@@ -42,25 +42,31 @@ def now_tw():
 
 
 def find_tiddler_start(json_str, title):
+    # "title":"값" 과 "title": "값" 두 형식 모두 검색
     for pat in ['"title":"' + title + '"',
-                '"title":' + json.dumps(title, ensure_ascii=True)]:
+                '"title": "' + title + '"',
+                '"title":' + json.dumps(title, ensure_ascii=True),
+                '"title": ' + json.dumps(title, ensure_ascii=True)]:
         idx = json_str.find(pat)
         if idx == -1:
             continue
         for i in range(idx, max(0, idx - 5000), -1):
-            if json_str[i] == '{' and json_str[i-1] in (',', '[', '\n'):
-                try:
-                    t, end = json.JSONDecoder().raw_decode(json_str[i:])
-                    if t.get('title') == title:
-                        return i, i + end
-                except:
-                    pass
+            if json_str[i] == '{':
+                prev = json_str[i-1] if i > 0 else '['
+                if prev in (',', '[', '\n', '\r', '\t', ' '):
+                    try:
+                        t, end = json.JSONDecoder().raw_decode(json_str[i:])
+                        if t.get('title') == title:
+                            return i, i + end
+                    except:
+                        pass
     return -1, -1
 
 
 def upsert(json_str, title, text, tags, modified, tiddler_type='text/markdown'):
     start, end = find_tiddler_start(json_str, title)
     if start != -1:
+        # 수정: 기존 티들러 교체
         t, _ = json.JSONDecoder().raw_decode(json_str[start:])
         t['text']     = text
         t['tags']     = tags
@@ -69,6 +75,8 @@ def upsert(json_str, title, text, tags, modified, tiddler_type='text/markdown'):
         new_str = json.dumps(t, ensure_ascii=False, separators=(',', ':'))
         return json_str[:start] + new_str + json_str[end:], '수정'
     else:
+        # 추가: 마지막 ] 위치를 rfind로 정확히 찾아서 삽입
+        last_bracket = json_str.rfind(']')
         new_t = {
             "created":  modified,
             "modified": modified,
@@ -78,38 +86,8 @@ def upsert(json_str, title, text, tags, modified, tiddler_type='text/markdown'):
             "text":     text
         }
         new_str = ',\n' + json.dumps(new_t, ensure_ascii=False, separators=(',', ':'))
-        return json_str[:-1] + new_str + ']', '추가'
+        return json_str[:last_bracket] + new_str + ']', '추가'
 
-
-def get_html_tags(path, docs_folder, tmp_prefix):
-    """
-    .html 파일 전용 태그 자동 추출 (폴더 경로 기반)
-    .md 파일은 이 함수 사용 안 함 — frontmatter로 직접 지정
-
-    일반 파일:
-      docs/여행/부산/해운대.html → "여행 부산"
-      docs/파일.html             → ""
-
-    ZIP 압축 해제 파일:
-      docs/html/test.zip 안 여행/부산/test.html → "html 여행 부산"
-      docs/html/test.zip 안 test.html           → "html"
-      docs/test.zip      안 여행/test.html       → "여행"
-    """
-    for tmp_dir, prefix in tmp_prefix.items():
-        if path.startswith(tmp_dir):
-            # ZIP 내부 폴더 태그
-            rel     = os.path.relpath(path, tmp_dir).replace('\\', '/')
-            folders = rel.split('/')[:-1]  # 파일명 제외
-            inner   = ' '.join(f for f in folders if f)
-            # zip 위치 태그 + 내부 폴더 태그 합산
-            parts   = [p for p in [prefix, inner] if p]
-            return ' '.join(parts)
-
-    # 일반 파일 — docs 기준 상위 폴더
-    rel     = os.path.relpath(path, docs_folder).replace('\\', '/')
-    folders = rel.split('/')[:-1]
-    folders = [f for f in folders if f and f not in ROOT_FOLDERS]
-    return ' '.join(folders)
 
 
 def extract_zip(zip_path, docs_folder):
@@ -181,18 +159,16 @@ for html_file, docs_folder in FILES.items():
         tmp_dir, prefix = extract_zip(zip_path, docs_folder)
         tmp_prefix[tmp_dir] = prefix
 
-    tmp_dirs = list(tmp_prefix.keys())
-
     # ── 파일 수집 ──
-    # .md 파일 (일반 + ZIP 안)
+    # .md 파일 (docs 직접 + ZIP 안)
     md_files = sorted(glob.glob(os.path.join(docs_folder, '**/*.md'), recursive=True))
-    for tmp_dir in tmp_dirs:
+    for tmp_dir in tmp_prefix.keys():
         md_files += sorted(glob.glob(os.path.join(tmp_dir, '**/*.md'), recursive=True))
 
-    # .html 파일 (일반 + ZIP 안)
+    # .html 파일 — docs 직접 파일만 수집 (ZIP 안에는 html 넣지 않음)
+    # iframe으로 감싸서 삽입 → JS/CSS 기능 작동, JSON 깨짐 방지
+    # 같은 title이면 .html이 .md 무조건 덮어씀
     html_src = sorted(glob.glob(os.path.join(docs_folder, '**/*.html'), recursive=True))
-    for tmp_dir in tmp_dirs:
-        html_src += sorted(glob.glob(os.path.join(tmp_dir, '**/*.html'), recursive=True))
 
     # ── html 파일 읽기 ──
     with open(html_file, 'r', encoding='utf-8') as f:
@@ -210,16 +186,17 @@ for html_file, docs_folder in FILES.items():
         meta, body = parse_frontmatter(raw)
         fname = os.path.splitext(os.path.basename(path))[0]
         title = meta.get('title', fname)
-        tags  = meta.get('tags', '')  # frontmatter 우선, 없으면 빈값
+        tags  = meta.get('tags', '')  # frontmatter 그대로, 없으면 빈값
         all_titles[title] = (body, tags, 'text/markdown')
 
-    # .html → 파일명이 title, 폴더 경로에서 tags 자동 추출
-    # 같은 title이면 .html이 .md 무조건 덮어씀
+    # .html → 파일명이 title, 상위 폴더명이 tags (docs 기준 자동 추출)
     for path in html_src:
-        with open(path, 'r', encoding='utf-8') as f:
-            body = f.read()
-        title = os.path.splitext(os.path.basename(path))[0]
-        tags  = get_html_tags(path, docs_folder, tmp_prefix)
+        title    = os.path.splitext(os.path.basename(path))[0]
+        rel      = os.path.relpath(path, docs_folder).replace('\\', '/')
+        folders  = [f for f in rel.split('/')[:-1] if f and f not in ROOT_FOLDERS]
+        tags     = ' '.join(folders)
+        rel_path = os.path.relpath(path, '.').replace('\\', '/')
+        body     = f'<iframe src="./{rel_path}" style="width:100%; height:80vh; border:none;" allowfullscreen></iframe>'
         all_titles[title] = (body, tags, 'text/html')
 
     # ── html 기존 티들러 수집 (내보내기용) ──
@@ -268,7 +245,7 @@ for html_file, docs_folder in FILES.items():
         f.write(html[:si] + result_json + html[ep:])
 
     # 임시 폴더 정리
-    for tmp_dir in tmp_dirs:
+    for tmp_dir in tmp_prefix.keys():
         shutil.rmtree(tmp_dir, ignore_errors=True)
 
     print(f"  → 추가 {count['추가']}개 / 수정 {count['수정']}개\n")
