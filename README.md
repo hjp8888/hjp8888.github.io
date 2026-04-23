@@ -133,17 +133,37 @@ class Singleton:
 
 `.md` 파일 외에 `.html` 파일도 docs 폴더에 넣으면 티들러로 자동 삽입돼요.
 
-### HTML 파일 규칙
+### md vs html 태그 규칙
 
-- **title** — 파일명 (확장자 제외). 프론트매터 없음
-- **tags** — 상위 폴더명에서 자동 추출. docs/docs2~docs5 자체는 태그 제외
-- **type** — `text/html` 로 삽입됨
+**md 파일** — 태그는 frontmatter 값만 사용. 폴더 위치는 무관
 
 ```
-docs/124.html              → title: "124",    tags: ""
-docs/여행/부산/해운대.html  → title: "해운대",  tags: "여행 부산"
-docs/1/2/279.html          → title: "279",    tags: "1 2"
+docs/여행/부산/파일.md  (tags: "일기")  →  태그: "일기"   ← frontmatter 우선
+docs/여행/부산/파일.md  (tags: "")      →  태그: ""       ← 빈 문자열 그대로
 ```
+
+**html 파일** — 태그는 폴더 경로에서 자동 추출 (frontmatter 없음)
+
+```
+docs/124.html              →  title: "124",    tags: ""
+docs/여행/부산/해운대.html  →  title: "해운대",  tags: "여행 부산"
+docs/1/2/279.html          →  title: "279",    tags: "1 2"
+```
+
+### ZIP 안에 html 파일이 있을 때
+
+ZIP 파일 위치 태그 + ZIP 내부 폴더 태그를 합산해요.
+
+```
+docs/html/test.zip
+  └── 여행/부산/test.html  →  tags: "html 여행 부산"
+  └── test.html            →  tags: "html"
+
+docs/test.zip
+  └── 여행/test.html       →  tags: "여행"
+```
+
+> ZIP 안의 md 파일은 태그 자동 추출 없이 frontmatter 그대로 사용해요.
 
 ### md vs html 우선순위
 
@@ -228,16 +248,19 @@ docs/서울.html  ← 이게 우선! title·내용·태그 모두 html 기준
 ```
 build.py 실행
  ├── 1. backup/ 자동 생성 (없으면) 후 타임스탬프로 html 백업 (파일당 최대 2개)
- ├── 2. docs~docs5 의 모든 .md / .html 파일 탐색 (하위폴더 포함)
- │       ├── .md  → 프론트매터 title/tags 파싱, type: text/markdown
- │       ├── .html → 파일명이 title, 폴더명이 tags, type: text/html
+ ├── 2. docs~docs5 의 모든 .zip 파일 → 임시폴더에 압축 해제
+ ├── 3. docs~docs5 의 모든 .md / .html 파일 탐색 (하위폴더 + zip 내부 포함)
+ │       ├── .md  → frontmatter title/tags 파싱, type: text/markdown
+ │       │          태그는 frontmatter 값만 사용 (폴더 자동 추출 없음)
+ │       ├── .html → 파일명이 title, 폴더 경로가 tags, type: text/html
+ │       │          태그는 폴더 경로 자동 추출 (zip 위치 + 내부 폴더 합산)
  │       ├── 같은 title이면 .html이 .md를 덮어씀
  │       └── 해당 html에 티들러 방식으로 삽입
  │           ├── 같은 제목 티들러 있으면 → 내용 수정
  │           └── 없으면 → 새 티들러 추가
- ├── 3. html에 있는데 docs에 없는 티들러
+ ├── 4. html에 있는데 docs에 없는 티들러
  │       └── docs 루트에 .md 파일로 자동 생성 (태그 포함)
- └── 4. index~index5.html 덮어쓰기
+ └── 5. index~index5.html 덮어쓰기
 ```
 
 ---
