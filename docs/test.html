@@ -1,0 +1,715 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Page</title>
+    <style>
+        /* ── CSS 변수 (tools.html 동일) ── */
+        :root {
+            --bg-color: #1a1a1a;
+            --card-bg: #2d2d2d;
+            --text-color: #e0e0e0;
+            --accent-color: #4a90e2;
+            --nav-bg: rgba(30, 30, 30, 0.85);
+            --border-color: #444;
+            --input-bg: #111;
+            --input-text: #b5e8b0;
+            --success-color: #2ecc71;
+            --warning-color: #f39c12;
+            --danger-color: #e74c3c;
+        }
+
+        /* ── 기본 레이아웃 ── */
+        * { box-sizing: border-box; }
+        body {
+            background: radial-gradient(circle at center, #262626 0%, var(--bg-color) 100%);
+            color: var(--text-color);
+            font-family: 'Pretendard', -apple-system, sans-serif;
+            margin: 0; padding: 0;
+            min-height: 100vh;
+        }
+
+        /* ── Navbar ── */
+        #navbar {
+            position: fixed; top: 0; left: 0; right: 0; z-index: 9999;
+            background: var(--nav-bg); height: 42px;
+            display: flex; align-items: center; padding: 0 20px;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 1px 8px rgba(0,0,0,0.3);
+        }
+        #navbar span {
+            color: #fff; font-size: 13px; font-weight: bold; margin-right: 16px;
+        }
+        #navbar small { color: #666; font-size: 11px; }
+
+        /* ── 탭 네비게이션 ── */
+        #tab-nav {
+            position: fixed; top: 42px; left: 0; right: 0; z-index: 9998;
+            background: rgba(25,25,25,0.95); border-bottom: 1px solid var(--border-color);
+            display: flex; overflow-x: auto; padding: 0 10px;
+            backdrop-filter: blur(8px);
+        }
+        #tab-nav::-webkit-scrollbar { display: none; }
+        .tab-btn {
+            padding: 0 16px; height: 40px; border: none; background: none;
+            color: rgba(255,255,255,0.5); font-size: 11px; cursor: pointer;
+            border-bottom: 2px solid transparent; white-space: nowrap;
+            transition: 0.2s; flex-shrink: 0; font-weight: normal; margin: 0;
+        }
+        .tab-btn.active {
+            color: var(--accent-color);
+            border-bottom: 2px solid var(--accent-color);
+            font-weight: bold;
+        }
+
+        /* ── 컨텐츠 영역 ── */
+        .container {
+            max-width: 860px; margin: 0 auto;
+            padding: 102px 20px 60px;
+        }
+        .tab-content { display: none; animation: fadeIn 0.25s; }
+        .tab-content.active { display: block; }
+        @keyframes fadeIn { from { opacity:0; transform:translateY(4px); } to { opacity:1; transform:translateY(0); } }
+
+        /* ── 카드 ── */
+        .card {
+            background: var(--card-bg); border-radius: 14px;
+            padding: 22px; margin-bottom: 20px;
+            border: 1px solid #3a3a3a;
+            box-shadow: 0 8px 30px rgba(0,0,0,0.2);
+        }
+        .card h3 { color: #fff; margin: 0 0 14px 0; font-size: 15px; }
+        .card p { color: #888; font-size: 12px; margin: 0 0 14px 0; line-height: 1.6; }
+
+        /* ── 공통 폼 요소 ── */
+        textarea, input[type=text], input[type=number], select {
+            width: 100%; background: var(--input-bg); color: var(--input-text);
+            border: 1px solid var(--border-color); border-radius: 8px;
+            padding: 10px 12px; font-family: 'Fira Code', monospace;
+            font-size: 13px; line-height: 1.6; outline: none;
+            box-sizing: border-box; transition: border 0.2s;
+        }
+        textarea { resize: vertical; margin-top: 8px; }
+        input[type=text]:focus, input[type=number]:focus,
+        textarea:focus, select:focus { border-color: var(--accent-color); }
+        select { color: #e0e0e0; cursor: pointer; margin-top: 8px; }
+
+        button {
+            background: var(--accent-color); color: #fff; border: none;
+            padding: 9px 16px; border-radius: 8px; cursor: pointer;
+            font-size: 11px; font-weight: bold; margin: 6px 6px 0 0;
+            transition: 0.2s;
+        }
+        button:hover { opacity: 0.8; }
+        button.danger { background: var(--danger-color); }
+        button.success { background: var(--success-color); }
+        button.warn { background: var(--warning-color); }
+
+        label.lbl {
+            font-size: 11px; color: #888; display: block; margin-bottom: 4px;
+        }
+
+        /* ── 결과 출력 박스 ── */
+        .result-box {
+            margin-top: 12px; background: #111; border: 1px solid #333;
+            border-radius: 8px; padding: 12px;
+            font-family: 'Fira Code', monospace; font-size: 12px;
+            line-height: 1.8; color: #aaa; min-height: 40px;
+            white-space: pre-wrap; word-break: break-all;
+        }
+        .result-box.ok  { border-color: rgba(46,204,113,0.4); color: #2ecc71; }
+        .result-box.err { border-color: rgba(231,76,60,0.4);  color: #e74c3c; }
+
+        /* ── 구분선 ── */
+        hr { border: none; border-top: 1px solid #333; margin: 16px 0; }
+
+        /* ── 인라인 행 ── */
+        .row { display: flex; gap: 8px; align-items: flex-end; flex-wrap: wrap; margin-top: 8px; }
+        .row > * { flex: 1; min-width: 120px; }
+        .row > button { flex: 0; white-space: nowrap; margin: 0; }
+
+        /* ── 배지 ── */
+        .badge {
+            display: inline-block; padding: 2px 8px; border-radius: 20px;
+            font-size: 10px; font-weight: bold; margin-left: 6px;
+        }
+        .badge.blue  { background: rgba(74,144,226,0.2); color: #4a90e2; }
+        .badge.green { background: rgba(46,204,113,0.2); color: #2ecc71; }
+    </style>
+</head>
+<body>
+
+<!-- ── Navbar ── -->
+<div id="navbar">
+    <span>🧪 Test Page</span>
+    <small>로컬 테스트 도구 모음</small>
+</div>
+
+<!-- ── 탭 네비게이션 ── -->
+<div id="tab-nav">
+    <button class="tab-btn active" onclick="switchTab('text-dl')">텍스트 다운로드</button>
+    <button class="tab-btn" onclick="switchTab('json-viewer')">JSON 뷰어</button>
+    <button class="tab-btn" onclick="switchTab('base64')">Base64</button>
+    <button class="tab-btn" onclick="switchTab('hash')">해시 생성</button>
+    <button class="tab-btn" onclick="switchTab('regex-test')">정규식 테스트</button>
+    <button class="tab-btn" onclick="switchTab('timestamp')">타임스탬프</button>
+    <button class="tab-btn" onclick="switchTab('color')">색상 변환</button>
+    <button class="tab-btn" onclick="switchTab('diff')">텍스트 비교</button>
+</div>
+
+<div class="container">
+
+    <!-- ══ 텍스트 다운로드 ══ -->
+    <div id="tab-text-dl" class="tab-content active">
+
+        <div class="card">
+            <h3>📄 텍스트 파일 다운로드</h3>
+            <p>작성한 내용을 텍스트 파일로 바로 저장해요.</p>
+
+            <label class="lbl">파일명</label>
+            <div class="row">
+                <input type="text" id="dl-filename" value="output" placeholder="파일명 (확장자 제외)">
+                <select id="dl-ext" style="flex:0; width:90px; margin-top:0;">
+                    <option value="txt">.txt</option>
+                    <option value="md">.md</option>
+                    <option value="html">.html</option>
+                    <option value="json">.json</option>
+                    <option value="csv">.csv</option>
+                    <option value="js">.js</option>
+                    <option value="css">.css</option>
+                    <option value="py">.py</option>
+                </select>
+            </div>
+
+            <label class="lbl" style="margin-top:12px;">내용</label>
+            <textarea id="dl-content" rows="12" placeholder="여기에 내용을 입력하세요..."></textarea>
+
+            <div style="display:flex; gap:8px; margin-top:10px; flex-wrap:wrap;">
+                <button onclick="downloadText()">💾 다운로드</button>
+                <button class="danger" onclick="document.getElementById('dl-content').value=''">🗑 초기화</button>
+                <button onclick="copyText('dl-content')">📋 복사</button>
+            </div>
+            <div id="dl-result" class="result-box" style="display:none;"></div>
+        </div>
+
+        <div class="card">
+            <h3>📋 클립보드 → 파일</h3>
+            <p>클립보드 내용을 바로 파일로 저장해요.</p>
+            <button onclick="clipboardToFile()">📋 클립보드 내용 가져와서 저장</button>
+            <div id="clip-result" class="result-box" style="display:none; margin-top:10px;"></div>
+        </div>
+
+    </div>
+
+    <!-- ══ JSON 뷰어 ══ -->
+    <div id="tab-json-viewer" class="tab-content">
+
+        <div class="card">
+            <h3>🔍 JSON 뷰어 / 포매터</h3>
+            <p>JSON을 붙여넣으면 검증하고 예쁘게 포매팅해요.</p>
+            <textarea id="json-input" rows="10" placeholder='{"key": "value"}'></textarea>
+            <div style="margin-top:8px; display:flex; gap:6px; flex-wrap:wrap;">
+                <button onclick="formatJson()">✨ 포매팅</button>
+                <button onclick="minifyJson()" class="warn">📦 압축</button>
+                <button onclick="copyText('json-output')" class="success">📋 복사</button>
+                <button onclick="downloadJson()" >💾 저장</button>
+            </div>
+            <div id="json-output" class="result-box" style="margin-top:10px; max-height:400px; overflow-y:auto;"></div>
+        </div>
+
+        <div class="card">
+            <h3>🔑 JSON 키 목록</h3>
+            <p>JSON 최상위 키만 추출해요.</p>
+            <button onclick="listJsonKeys()">키 목록 보기</button>
+            <div id="json-keys" class="result-box" style="margin-top:10px; display:none;"></div>
+        </div>
+
+    </div>
+
+    <!-- ══ Base64 ══ -->
+    <div id="tab-base64" class="tab-content">
+
+        <div class="card">
+            <h3>🔐 텍스트 ↔ Base64</h3>
+            <textarea id="b64-input" rows="6" placeholder="텍스트 또는 Base64 입력..."></textarea>
+            <div style="margin-top:8px;">
+                <button onclick="encodeB64()">→ Base64 인코딩</button>
+                <button onclick="decodeB64()" class="warn">← Base64 디코딩</button>
+                <button onclick="copyText('b64-output')" class="success">📋 복사</button>
+            </div>
+            <div id="b64-output" class="result-box" style="margin-top:10px;"></div>
+        </div>
+
+        <div class="card">
+            <h3>🖼️ 이미지 → Base64</h3>
+            <p>이미지 파일을 Base64 문자열로 변환해요.</p>
+            <input type="file" id="img-b64-input" accept="image/*"
+                style="color:#aaa; background:#111; border:1px solid #444; border-radius:8px; padding:8px; width:100%; cursor:pointer; margin-top:0;">
+            <div id="img-b64-output" class="result-box" style="margin-top:10px; display:none; max-height:200px; overflow-y:auto;"></div>
+            <button id="img-b64-copy" onclick="copyText('img-b64-output')" class="success" style="display:none; margin-top:8px;">📋 복사</button>
+        </div>
+
+    </div>
+
+    <!-- ══ 해시 생성 ══ -->
+    <div id="tab-hash" class="tab-content">
+
+        <div class="card">
+            <h3>#️⃣ 해시 생성 (SHA-256)</h3>
+            <p>텍스트의 SHA-256 해시값을 생성해요. (브라우저 Web Crypto API 사용)</p>
+            <textarea id="hash-input" rows="5" placeholder="해시화할 텍스트 입력..."></textarea>
+            <button onclick="generateHash()" style="margin-top:8px;">해시 생성</button>
+            <button onclick="copyText('hash-output')" class="success">📋 복사</button>
+            <div id="hash-output" class="result-box" style="margin-top:10px;"></div>
+        </div>
+
+        <div class="card">
+            <h3>🎲 랜덤 문자열 생성</h3>
+            <div class="row">
+                <div>
+                    <label class="lbl">길이</label>
+                    <input type="number" id="rand-len" value="32" min="1" max="256">
+                </div>
+                <div>
+                    <label class="lbl">형식</label>
+                    <select id="rand-type">
+                        <option value="hex">HEX</option>
+                        <option value="alpha">영문+숫자</option>
+                        <option value="num">숫자만</option>
+                        <option value="uuid">UUID v4</option>
+                    </select>
+                </div>
+            </div>
+            <button onclick="generateRandom()" style="margin-top:10px;">생성</button>
+            <button onclick="copyText('rand-output')" class="success">📋 복사</button>
+            <div id="rand-output" class="result-box" style="margin-top:10px;"></div>
+        </div>
+
+    </div>
+
+    <!-- ══ 정규식 테스트 ══ -->
+    <div id="tab-regex-test" class="tab-content">
+
+        <div class="card">
+            <h3>🔎 정규식 테스트</h3>
+            <label class="lbl">패턴</label>
+            <div class="row">
+                <input type="text" id="regex-pattern" placeholder="정규식 패턴 (/ / 없이)" style="margin-top:0;">
+                <input type="text" id="regex-flags" value="g" placeholder="플래그 (g, i, m ...)" style="flex:0; width:80px; margin-top:0;">
+            </div>
+            <label class="lbl" style="margin-top:12px;">테스트 문자열</label>
+            <textarea id="regex-text" rows="6" placeholder="여기에 테스트할 텍스트 입력..."></textarea>
+            <button onclick="testRegex()" style="margin-top:8px;">테스트</button>
+            <button onclick="copyText('regex-result')" class="success">📋 결과 복사</button>
+            <div id="regex-result" class="result-box" style="margin-top:10px;"></div>
+        </div>
+
+        <div class="card">
+            <h3>🔁 정규식 치환</h3>
+            <label class="lbl">치환 문자열</label>
+            <input type="text" id="regex-replace" placeholder="치환할 내용 ($1, $2 그룹 참조 가능)" style="margin-top:4px;">
+            <button onclick="replaceRegex()" style="margin-top:8px;">치환</button>
+            <button onclick="copyText('regex-replaced')" class="success">📋 복사</button>
+            <div id="regex-replaced" class="result-box" style="margin-top:10px;"></div>
+        </div>
+
+    </div>
+
+    <!-- ══ 타임스탬프 ══ -->
+    <div id="tab-timestamp" class="tab-content">
+
+        <div class="card">
+            <h3>⏱️ 현재 시간</h3>
+            <div id="ts-now" class="result-box ok"></div>
+            <button onclick="refreshTs()" style="margin-top:8px;">🔄 새로고침</button>
+            <button onclick="copyVal(document.getElementById('ts-unix').innerText)" class="success">Unix 복사</button>
+        </div>
+
+        <div class="card">
+            <h3>🔄 Unix 타임스탬프 변환</h3>
+            <label class="lbl">Unix 타임스탬프 (초 또는 밀리초)</label>
+            <div class="row">
+                <input type="text" id="ts-input" placeholder="1700000000 또는 1700000000000" style="margin-top:0;">
+                <button onclick="convertTs()" style="margin-top:0;">변환</button>
+            </div>
+            <div id="ts-result" class="result-box" style="margin-top:10px;"></div>
+        </div>
+
+        <div class="card">
+            <h3>📅 날짜 → Unix</h3>
+            <label class="lbl">날짜 입력</label>
+            <input type="text" id="date-input" placeholder="2024-01-01 또는 2024-01-01 12:00:00" style="margin-top:4px;">
+            <button onclick="dateToUnix()" style="margin-top:8px;">변환</button>
+            <div id="date-result" class="result-box" style="margin-top:10px;"></div>
+        </div>
+
+    </div>
+
+    <!-- ══ 색상 변환 ══ -->
+    <div id="tab-color" class="tab-content">
+
+        <div class="card">
+            <h3>🎨 색상 변환</h3>
+            <p>HEX ↔ RGB ↔ HSL 변환해요.</p>
+            <div class="row">
+                <div>
+                    <label class="lbl">HEX</label>
+                    <input type="text" id="color-hex" placeholder="#4a90e2" oninput="hexToAll()" style="margin-top:4px;">
+                </div>
+                <div>
+                    <label class="lbl">미리보기</label>
+                    <div id="color-preview" style="height:38px; border-radius:8px; border:1px solid #444; margin-top:4px; background:#4a90e2;"></div>
+                </div>
+            </div>
+            <div id="color-result" class="result-box" style="margin-top:12px;"></div>
+        </div>
+
+        <div class="card">
+            <h3>🖌️ RGB → HEX</h3>
+            <div class="row">
+                <div><label class="lbl">R</label><input type="number" id="rgb-r" min="0" max="255" placeholder="0~255" oninput="rgbToHex()" style="margin-top:4px;"></div>
+                <div><label class="lbl">G</label><input type="number" id="rgb-g" min="0" max="255" placeholder="0~255" oninput="rgbToHex()" style="margin-top:4px;"></div>
+                <div><label class="lbl">B</label><input type="number" id="rgb-b" min="0" max="255" placeholder="0~255" oninput="rgbToHex()" style="margin-top:4px;"></div>
+            </div>
+            <div id="rgb-result" class="result-box" style="margin-top:12px;"></div>
+        </div>
+
+    </div>
+
+    <!-- ══ 텍스트 비교 ══ -->
+    <div id="tab-diff" class="tab-content">
+
+        <div class="card">
+            <h3>📊 텍스트 비교 (줄 단위)</h3>
+            <p>두 텍스트를 줄 단위로 비교해요. 추가된 줄은 초록, 제거된 줄은 빨강으로 표시돼요.</p>
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+                <div>
+                    <label class="lbl">원본</label>
+                    <textarea id="diff-a" rows="10" placeholder="원본 텍스트..." style="margin-top:4px;"></textarea>
+                </div>
+                <div>
+                    <label class="lbl">비교</label>
+                    <textarea id="diff-b" rows="10" placeholder="비교할 텍스트..." style="margin-top:4px;"></textarea>
+                </div>
+            </div>
+            <button onclick="runDiff()" style="margin-top:10px;">비교하기</button>
+            <button class="danger" onclick="document.getElementById('diff-a').value=''; document.getElementById('diff-b').value=''; document.getElementById('diff-result').innerHTML='';">초기화</button>
+            <div id="diff-result" style="margin-top:14px; font-family:'Fira Code',monospace; font-size:12px; line-height:1.8;"></div>
+        </div>
+
+    </div>
+
+</div><!-- /container -->
+
+<script>
+    /* ── 탭 전환 ── */
+    function switchTab(id) {
+        document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+        document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+        document.getElementById('tab-' + id).classList.add('active');
+        event.currentTarget.classList.add('active');
+    }
+
+    /* ── 공통 유틸 ── */
+    function copyText(id) {
+        const el = document.getElementById(id);
+        const text = el.value !== undefined ? el.value : el.innerText;
+        navigator.clipboard.writeText(text).then(() => {
+            const btn = event.target;
+            const old = btn.innerText; btn.innerText = '복사됨!';
+            setTimeout(() => btn.innerText = old, 1200);
+        });
+    }
+    function copyVal(text) {
+        navigator.clipboard.writeText(text);
+    }
+    function showResult(id, text, type='') {
+        const el = document.getElementById(id);
+        el.innerText = text;
+        el.className = 'result-box' + (type ? ' ' + type : '');
+        el.style.display = 'block';
+    }
+
+    /* ════════════════════════════
+       텍스트 다운로드
+    ════════════════════════════ */
+    function downloadText() {
+        const content  = document.getElementById('dl-content').value;
+        const filename = document.getElementById('dl-filename').value.trim() || 'output';
+        const ext      = document.getElementById('dl-ext').value;
+        if (!content.trim()) { showResult('dl-result', '❌ 내용을 입력하세요.', 'err'); return; }
+        const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+        const url  = URL.createObjectURL(blob);
+        const a    = document.createElement('a');
+        a.href = url; a.download = `${filename}.${ext}`; a.click();
+        URL.revokeObjectURL(url);
+        showResult('dl-result', `✅ ${filename}.${ext} 저장 완료!`, 'ok');
+    }
+    async function clipboardToFile() {
+        try {
+            const text = await navigator.clipboard.readText();
+            const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+            const url  = URL.createObjectURL(blob);
+            const a    = document.createElement('a');
+            a.href = url; a.download = `clipboard_${Date.now()}.txt`; a.click();
+            URL.revokeObjectURL(url);
+            showResult('clip-result', `✅ 클립보드 ${text.length}자 → 파일 저장 완료!`, 'ok');
+        } catch(e) {
+            showResult('clip-result', '❌ 클립보드 읽기 실패. 브라우저 권한을 확인하세요.', 'err');
+        }
+    }
+
+    /* ════════════════════════════
+       JSON 뷰어
+    ════════════════════════════ */
+    function formatJson() {
+        try {
+            const obj = JSON.parse(document.getElementById('json-input').value);
+            document.getElementById('json-output').innerText = JSON.stringify(obj, null, 2);
+            document.getElementById('json-output').className = 'result-box ok';
+        } catch(e) {
+            showResult('json-output', '❌ JSON 파싱 오류: ' + e.message, 'err');
+        }
+    }
+    function minifyJson() {
+        try {
+            const obj = JSON.parse(document.getElementById('json-input').value);
+            document.getElementById('json-output').innerText = JSON.stringify(obj);
+            document.getElementById('json-output').className = 'result-box ok';
+        } catch(e) {
+            showResult('json-output', '❌ JSON 파싱 오류: ' + e.message, 'err');
+        }
+    }
+    function downloadJson() {
+        const text = document.getElementById('json-output').innerText;
+        if (!text) return;
+        const blob = new Blob([text], { type: 'application/json' });
+        const url  = URL.createObjectURL(blob);
+        const a    = document.createElement('a');
+        a.href = url; a.download = `data_${Date.now()}.json`; a.click();
+        URL.revokeObjectURL(url);
+    }
+    function listJsonKeys() {
+        try {
+            const obj = JSON.parse(document.getElementById('json-input').value);
+            const keys = Object.keys(obj);
+            showResult('json-keys', `총 ${keys.length}개 키:\n` + keys.map((k,i) => `${i+1}. ${k}`).join('\n'), 'ok');
+        } catch(e) {
+            showResult('json-keys', '❌ JSON 파싱 오류: ' + e.message, 'err');
+        }
+    }
+
+    /* ════════════════════════════
+       Base64
+    ════════════════════════════ */
+    function encodeB64() {
+        try {
+            const text = document.getElementById('b64-input').value;
+            const result = btoa(unescape(encodeURIComponent(text)));
+            showResult('b64-output', result, 'ok');
+        } catch(e) {
+            showResult('b64-output', '❌ 인코딩 오류: ' + e.message, 'err');
+        }
+    }
+    function decodeB64() {
+        try {
+            const text = document.getElementById('b64-input').value.trim();
+            const result = decodeURIComponent(escape(atob(text)));
+            showResult('b64-output', result, 'ok');
+        } catch(e) {
+            showResult('b64-output', '❌ 디코딩 오류: 올바른 Base64 문자열인지 확인하세요.', 'err');
+        }
+    }
+    document.getElementById('img-b64-input').onchange = (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+            const out = document.getElementById('img-b64-output');
+            out.innerText = ev.target.result;
+            out.style.display = 'block';
+            out.className = 'result-box ok';
+            document.getElementById('img-b64-copy').style.display = 'inline-block';
+        };
+        reader.readAsDataURL(file);
+    };
+
+    /* ════════════════════════════
+       해시 생성
+    ════════════════════════════ */
+    async function generateHash() {
+        const text = document.getElementById('hash-input').value;
+        if (!text) { showResult('hash-output', '❌ 텍스트를 입력하세요.', 'err'); return; }
+        const msgBuffer = new TextEncoder().encode(text);
+        const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
+        const hashArray = Array.from(new Uint8Array(hashBuffer));
+        const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+        showResult('hash-output', hashHex, 'ok');
+    }
+    function generateRandom() {
+        const len  = parseInt(document.getElementById('rand-len').value) || 32;
+        const type = document.getElementById('rand-type').value;
+        let result = '';
+        if (type === 'uuid') {
+            result = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+                const r = Math.random() * 16 | 0;
+                return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+            });
+        } else {
+            const chars = type === 'hex'   ? '0123456789abcdef'
+                        : type === 'num'   ? '0123456789'
+                        : 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+            const arr = new Uint8Array(len);
+            crypto.getRandomValues(arr);
+            result = Array.from(arr).map(b => chars[b % chars.length]).join('').slice(0, len);
+        }
+        showResult('rand-output', result, 'ok');
+    }
+
+    /* ════════════════════════════
+       정규식 테스트
+    ════════════════════════════ */
+    function testRegex() {
+        const pattern = document.getElementById('regex-pattern').value;
+        const flags   = document.getElementById('regex-flags').value;
+        const text    = document.getElementById('regex-text').value;
+        if (!pattern) { showResult('regex-result', '❌ 패턴을 입력하세요.', 'err'); return; }
+        try {
+            const re = new RegExp(pattern, flags);
+            const matches = [...text.matchAll(new RegExp(pattern, flags.includes('g') ? flags : flags+'g'))];
+            if (matches.length === 0) {
+                showResult('regex-result', '❌ 매칭 없음', 'err');
+            } else {
+                const info = matches.map((m, i) => `[${i+1}] "${m[0]}" (index: ${m.index})`).join('\n');
+                showResult('regex-result', `✅ ${matches.length}개 매칭:\n` + info, 'ok');
+            }
+        } catch(e) {
+            showResult('regex-result', '❌ 정규식 오류: ' + e.message, 'err');
+        }
+    }
+    function replaceRegex() {
+        const pattern = document.getElementById('regex-pattern').value;
+        const flags   = document.getElementById('regex-flags').value;
+        const text    = document.getElementById('regex-text').value;
+        const repl    = document.getElementById('regex-replace').value;
+        if (!pattern) { showResult('regex-replaced', '❌ 패턴을 입력하세요.', 'err'); return; }
+        try {
+            const re = new RegExp(pattern, flags);
+            const result = text.replace(re, repl);
+            showResult('regex-replaced', result, 'ok');
+        } catch(e) {
+            showResult('regex-replaced', '❌ 정규식 오류: ' + e.message, 'err');
+        }
+    }
+
+    /* ════════════════════════════
+       타임스탬프
+    ════════════════════════════ */
+    function refreshTs() {
+        const now = new Date();
+        const unix = Math.floor(now.getTime() / 1000);
+        document.getElementById('ts-now').innerHTML =
+            `로컬 시간:  ${now.toLocaleString('ko-KR')}\n` +
+            `UTC:        ${now.toUTCString()}\n` +
+            `ISO 8601:   ${now.toISOString()}\n` +
+            `Unix (초):  <span id="ts-unix">${unix}</span>\n` +
+            `Unix (ms):  ${now.getTime()}`;
+    }
+    function convertTs() {
+        const val = document.getElementById('ts-input').value.trim();
+        if (!val) return;
+        let ts = parseInt(val);
+        if (ts > 1e12) ts = Math.floor(ts / 1000); // ms → 초
+        const d = new Date(ts * 1000);
+        if (isNaN(d.getTime())) { showResult('ts-result', '❌ 유효하지 않은 타임스탬프', 'err'); return; }
+        showResult('ts-result',
+            `로컬:  ${d.toLocaleString('ko-KR')}\nUTC:   ${d.toUTCString()}\nISO:   ${d.toISOString()}`, 'ok');
+    }
+    function dateToUnix() {
+        const val = document.getElementById('date-input').value.trim();
+        const d = new Date(val);
+        if (isNaN(d.getTime())) { showResult('date-result', '❌ 날짜 형식 오류 (예: 2024-01-01 또는 2024-01-01 12:00:00)', 'err'); return; }
+        showResult('date-result',
+            `Unix (초): ${Math.floor(d.getTime()/1000)}\nUnix (ms): ${d.getTime()}`, 'ok');
+    }
+    refreshTs(); // 초기 실행
+
+    /* ════════════════════════════
+       색상 변환
+    ════════════════════════════ */
+    function hexToAll() {
+        let hex = document.getElementById('color-hex').value.trim().replace('#','');
+        if (hex.length === 3) hex = hex.split('').map(c=>c+c).join('');
+        if (hex.length !== 6) { showResult('color-result', '❌ 올바른 HEX 값을 입력하세요. (예: #4a90e2)', 'err'); return; }
+        const r = parseInt(hex.slice(0,2),16);
+        const g = parseInt(hex.slice(2,4),16);
+        const b = parseInt(hex.slice(4,6),16);
+        document.getElementById('color-preview').style.background = `#${hex}`;
+        const [h, s, l] = rgbToHsl(r, g, b);
+        showResult('color-result',
+            `HEX:  #${hex}\nRGB:  rgb(${r}, ${g}, ${b})\nHSL:  hsl(${h}, ${s}%, ${l}%)\nRGBA: rgba(${r}, ${g}, ${b}, 1.0)`, 'ok');
+    }
+    function rgbToHex() {
+        const r = parseInt(document.getElementById('rgb-r').value)||0;
+        const g = parseInt(document.getElementById('rgb-g').value)||0;
+        const b = parseInt(document.getElementById('rgb-b').value)||0;
+        const hex = [r,g,b].map(v=>Math.min(255,Math.max(0,v)).toString(16).padStart(2,'0')).join('');
+        showResult('rgb-result', `HEX: #${hex}\nRGB: rgb(${r}, ${g}, ${b})`, 'ok');
+    }
+    function rgbToHsl(r, g, b) {
+        r/=255; g/=255; b/=255;
+        const max=Math.max(r,g,b), min=Math.min(r,g,b);
+        let h, s, l=(max+min)/2;
+        if (max===min) { h=s=0; }
+        else {
+            const d=max-min; s=l>0.5?d/(2-max-min):d/(max+min);
+            h = max===r ? (g-b)/d+(g<b?6:0) : max===g ? (b-r)/d+2 : (r-g)/d+4;
+            h = Math.round(h*60);
+        }
+        return [h, Math.round(s*100), Math.round(l*100)];
+    }
+
+    /* ════════════════════════════
+       텍스트 비교 (줄 단위 diff)
+    ════════════════════════════ */
+    function runDiff() {
+        const a = document.getElementById('diff-a').value.split('\n');
+        const b = document.getElementById('diff-b').value.split('\n');
+        const result = document.getElementById('diff-result');
+        let html = '';
+        const aSet = new Set(a), bSet = new Set(b);
+
+        // 간단한 줄 단위 비교
+        const allLines = new Set([...a, ...b]);
+        const removed = a.filter(l => !bSet.has(l));
+        const added   = b.filter(l => !aSet.has(l));
+        const same    = a.filter(l => bSet.has(l));
+
+        if (removed.length === 0 && added.length === 0) {
+            result.innerHTML = '<span style="color:#2ecc71;">✅ 두 텍스트가 동일해요!</span>';
+            return;
+        }
+
+        let out = `<span style="color:#888;">공통 줄: ${same.length}개 | `;
+        out += `<span style="color:#e74c3c;">제거: ${removed.length}개</span> | `;
+        out += `<span style="color:#2ecc71;">추가: ${added.length}개</span></span>\n\n`;
+
+        b.forEach(line => {
+            if (aSet.has(line)) {
+                out += `<span style="color:#666;">  ${line}</span>\n`;
+            } else {
+                out += `<span style="background:rgba(46,204,113,0.15); color:#2ecc71;">+ ${line}</span>\n`;
+            }
+        });
+        a.forEach(line => {
+            if (!bSet.has(line)) {
+                out += `<span style="background:rgba(231,76,60,0.15); color:#e74c3c;">- ${line}</span>\n`;
+            }
+        });
+
+        result.innerHTML = out;
+    }
+</script>
+</body>
+</html>
