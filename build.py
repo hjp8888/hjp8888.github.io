@@ -49,14 +49,14 @@ def find_tiddler_start(json_str, title):
                     pass
     return -1, -1
 
-def upsert(json_str, title, text, tags, modified):
+def upsert(json_str, title, text, tags, modified, tiddler_type='text/markdown'):
     start, end = find_tiddler_start(json_str, title)
     if start != -1:
         t, _ = json.JSONDecoder().raw_decode(json_str[start:])
         t['text']     = text
         t['tags']     = tags
         t['modified'] = modified
-        t['type']     = 'text/markdown'
+        t['type']     = tiddler_type
         new_str = json.dumps(t, ensure_ascii=False, separators=(',',':'))
         return json_str[:start] + new_str + json_str[end:], '수정'
     else:
@@ -65,7 +65,7 @@ def upsert(json_str, title, text, tags, modified):
             "modified": modified,
             "title":    title,
             "tags":     tags,
-            "type":     "text/markdown",
+            "type":     tiddler_type,
             "text":     text
         }
         new_str = ',\n' + json.dumps(new_t, ensure_ascii=False, separators=(',',':'))
@@ -131,10 +131,33 @@ for html_file, docs_folder in FILES.items():
         except Exception as e:
             print(f"  ⚠ ZIP 오류: {e}")
 
-    # docs의 모든 .md 파일 수집 (일반 파일 + ZIP 압축 해제 파일)
+    # ── docs 루트 폴더명 목록 (태그 제외 대상) ──
+    ROOT_FOLDERS = {'docs', 'docs2', 'docs3', 'docs4', 'docs5'}
+
+    def get_tags_from_path(path, base_folder):
+        """
+        경로에서 태그 추출
+        - base_folder (docs 등) 는 제외
+        - 파일명 직전 폴더들만 태그로 사용
+        ex) docs/1/2/279.html → 태그: "1 2"
+        ex) docs/124.md       → 태그: ""
+        """
+        rel = os.path.relpath(path, base_folder)      # 1/2/279.html
+        parts = rel.replace('\\', '/').split('/')      # ['1', '2', '279.html']
+        folders = parts[:-1]                           # ['1', '2']
+        # tmp_dir 기반 경로면 base_folder가 tmp_dir인 경우도 있으므로 ROOT_FOLDERS 제외
+        folders = [f for f in folders if f not in ROOT_FOLDERS]
+        return ' '.join(folders)
+
+    # docs의 모든 .md 파일 수집 (일반 + ZIP 압축 해제)
     md_files = sorted(glob.glob(os.path.join(docs_folder, '**/*.md'), recursive=True))
     for tmp_dir in tmp_dirs:
         md_files += sorted(glob.glob(os.path.join(tmp_dir, '**/*.md'), recursive=True))
+
+    # docs의 모든 .html 파일 수집 (일반 + ZIP 압축 해제)
+    html_src_files = sorted(glob.glob(os.path.join(docs_folder, '**/*.html'), recursive=True))
+    for tmp_dir in tmp_dirs:
+        html_src_files += sorted(glob.glob(os.path.join(tmp_dir, '**/*.html'), recursive=True))
 
     with open(html_file, 'r', encoding='utf-8') as f:
         html = f.read()
@@ -142,45 +165,70 @@ for html_file, docs_folder in FILES.items():
     tiddlers, si, ep = get_store(html)
     result_json = html[si:ep]
 
-    # md 파일에서 title 목록 수집
-    md_titles = {}
+    # ── .md 파일에서 title 목록 수집 ──
+    # { title: (path, body, tags, type) }
+    all_titles = {}
+
     for path in md_files:
         with open(path, 'r', encoding='utf-8') as f:
             raw = f.read()
         meta, body = parse_frontmatter(raw)
         fname = os.path.splitext(os.path.basename(path))[0]
         title = meta.get('title', fname)
-        tags  = meta.get('tags', '')
-        md_titles[title] = (path, body, tags)
 
-    # html 티들러 목록 수집 (마크다운 타입만, 태그 포함)
+        # 태그: frontmatter 우선, 없으면 폴더 경로에서 추출
+        base = docs_folder if docs_folder in path else next(
+            (td for td in tmp_dirs if path.startswith(td)), docs_folder)
+        tags = meta.get('tags') or get_tags_from_path(path, base)
+
+        all_titles[title] = (path, body, tags, 'text/markdown')
+
+    # ── .html 파일에서 title 목록 수집 (md보다 나중에 → 같은 title이면 덮어씀) ──
+    for path in html_src_files:
+        with open(path, 'r', encoding='utf-8') as f:
+            body = f.read()
+        fname = os.path.splitext(os.path.basename(path))[0]
+        title = fname  # html은 파일명이 title
+
+        # 태그: 폴더 경로에서 자동 추출
+        base = docs_folder if docs_folder in path else next(
+            (td for td in tmp_dirs if path.startswith(td)), docs_folder)
+        tags = get_tags_from_path(path, base)
+
+        # 같은 title이 md에 있어도 html이 무조건 덮어씀
+        all_titles[title] = (path, body, tags, 'text/html')
+
+    # html 티들러 목록 수집 (마크다운 + html 타입, 태그 포함)
     html_titles = {}
     for t in tiddlers:
-        if t.get('type') == 'text/markdown' and not t.get('title','').startswith('$:/'):
+        if t.get('type') in ('text/markdown', 'text/html') and not t.get('title','').startswith('$:/'):
             tags = t.get('tags', '')
             if isinstance(tags, list):
-                tags = ' '.join(tags)  # 리스트면 공백으로 연결
+                tags = ' '.join(tags)
             html_titles[t['title']] = {
                 'text': t.get('text', ''),
-                'tags': tags
+                'tags': tags,
+                'type': t.get('type', 'text/markdown')
             }
 
     print(f"── {html_file} ({docs_folder}) ──")
-    print(f"  html 마크다운 티들러: {len(html_titles)}개")
-    print(f"  docs .md 파일: {len(md_titles)}개")
+    print(f"  html 티들러: {len(html_titles)}개")
+    print(f"  docs .md 파일: {len([v for v in all_titles.values() if v[3]=='text/markdown'])}개")
+    print(f"  docs .html 파일: {len([v for v in all_titles.values() if v[3]=='text/html'])}개")
 
     count = {'추가': 0, '수정': 0}
 
-    # docs → html (upsert)
-    for title, (path, body, tags) in md_titles.items():
-        result_json, action = upsert(result_json, title, body, tags, now_tw())
+    # docs → html (upsert) — md/html 통합
+    for title, (path, body, tags, ttype) in all_titles.items():
+        result_json, action = upsert(result_json, title, body, tags, now_tw(), ttype)
         count[action] += 1
         tag_str = f"[{tags}] " if tags else ""
-        print(f"  {action}: {tag_str}{title}")
+        ext = '.html' if ttype == 'text/html' else '.md'
+        print(f"  {action}({ext}): {tag_str}{title}")
 
     # html → docs (없는 티들러 md 파일로 내보내기, 태그 포함)
     for title, data in html_titles.items():
-        if title not in md_titles:
+        if title not in all_titles:
             safe_name = re.sub(r'[\\/*?:"<>|]', '_', title)
             out_path = os.path.join(docs_folder, f"{safe_name}.md")
             content = f"---\ntitle: \"{title}\"\ntags: \"{data['tags']}\"\n---\n{data['text']}"
@@ -203,3 +251,4 @@ for html_file, docs_folder in FILES.items():
     total_mod += count['수정']
 
 print(f"✓ 완료! 추가 {total_add} / 수정 {total_mod} / 내보내기 {total_export}")
+
