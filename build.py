@@ -42,7 +42,6 @@ def now_tw():
 
 
 def find_tiddler_start(json_str, title):
-    # "title":"값" 과 "title": "값" 두 형식 모두 검색
     for pat in ['"title":"' + title + '"',
                 '"title": "' + title + '"',
                 '"title":' + json.dumps(title, ensure_ascii=True),
@@ -66,7 +65,6 @@ def find_tiddler_start(json_str, title):
 def upsert(json_str, title, text, tags, modified, tiddler_type='text/markdown'):
     start, end = find_tiddler_start(json_str, title)
     if start != -1:
-        # 수정: 기존 티들러 교체
         t, _ = json.JSONDecoder().raw_decode(json_str[start:])
         t['text']     = text
         t['tags']     = tags
@@ -75,7 +73,6 @@ def upsert(json_str, title, text, tags, modified, tiddler_type='text/markdown'):
         new_str = json.dumps(t, ensure_ascii=False, separators=(',', ':'))
         return json_str[:start] + new_str + json_str[end:], '수정'
     else:
-        # 추가: 마지막 ] 위치를 rfind로 정확히 찾아서 삽입
         last_bracket = json_str.rfind(']')
         new_t = {
             "created":  modified,
@@ -90,20 +87,10 @@ def upsert(json_str, title, text, tags, modified, tiddler_type='text/markdown'):
 
 
 def extract_zip(zip_path, docs_folder):
-    """
-    ZIP 파일 압축 해제 후 (임시폴더, zip위치태그) 반환
-    한글 파일명 EUC-KR 자동 대응
-    """
     tmp_dir = tempfile.mkdtemp()
-
-    # zip 위치 태그: docs 기준 zip 파일의 상위 폴더
     zip_rel = os.path.relpath(os.path.dirname(zip_path), docs_folder)
     zip_rel = zip_rel.replace('\\', '/')
     prefix  = '' if zip_rel == '.' else zip_rel.replace('/', ' ')
-
-    print(f"  📦 ZIP: {os.path.basename(zip_path)}" +
-          (f" → 위치 태그: [{prefix}]" if prefix else ""))
-
     try:
         with zipfile.ZipFile(zip_path, 'r') as z:
             for info in z.infolist():
@@ -120,141 +107,112 @@ def extract_zip(zip_path, docs_folder):
                         dst.write(src.read())
     except Exception as e:
         print(f"  ⚠ ZIP 오류: {e}")
-
     return tmp_dir, prefix
 
 
-# ── 1. 백업 (파일당 MAX_BACKUPS개 유지) ──
+# ── 1. 백업 ──
 os.makedirs(BACKUP_DIR, exist_ok=True)
 timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-
 for html_file in FILES:
-    if not os.path.exists(html_file):
-        continue
+    if not os.path.exists(html_file): continue
     pattern  = os.path.join(BACKUP_DIR, f'*_{html_file}')
     existing = sorted(glob.glob(pattern))
-    while len(existing) >= MAX_BACKUPS:
-        os.remove(existing.pop(0))
-    backup_name = f"{timestamp}_{html_file}"
-    shutil.copy(html_file, os.path.join(BACKUP_DIR, backup_name))
-    print(f"✓ 백업: {backup_name}")
-
-print()
+    while len(existing) >= MAX_BACKUPS: os.remove(existing.pop(0))
+    shutil.copy(html_file, os.path.join(BACKUP_DIR, f"{timestamp}_{html_file}"))
 
 # ── 2. 메인 루프 ──────────────────────
 total_add = total_mod = total_export = 0
 
 for html_file, docs_folder in FILES.items():
-    if not os.path.exists(html_file):
-        print(f"⚠ {html_file} 없음, 건너뜀\n")
-        continue
-
+    if not os.path.exists(html_file): continue
     os.makedirs(docs_folder, exist_ok=True)
 
-    # ── ZIP 압축 해제 ──
-    # { tmp_dir: prefix_tag } — .html 태그 추출 시 사용
+    # ZIP 처리
     tmp_prefix = {}
     for zip_path in glob.glob(os.path.join(docs_folder, '**/*.zip'), recursive=True):
-        tmp_dir, prefix = extract_zip(zip_path, docs_folder)
-        tmp_prefix[tmp_dir] = prefix
+        tmp_dir, _ = extract_zip(zip_path, docs_folder)
+        tmp_prefix[tmp_dir] = ""
 
-    # ── 파일 수집 ──
     md_files = sorted(glob.glob(os.path.join(docs_folder, '**/*.md'), recursive=True))
     for tmp_dir in tmp_prefix.keys():
         md_files += sorted(glob.glob(os.path.join(tmp_dir, '**/*.md'), recursive=True))
 
     html_src = sorted(glob.glob(os.path.join(docs_folder, '**/*.html'), recursive=True))
 
-    # ── html 파일 읽기 ──
     with open(html_file, 'r', encoding='utf-8') as f:
-        html = f.read()
-    tiddlers, si, ep = get_store(html)
-    result_json = html[si:ep]
+        html_content = f.read()
+    tiddlers, si, ep = get_store(html_content)
+    result_json = html_content[si:ep]
 
-    # ── 수집: { title: (body, tags, type) } ──
     all_titles = {}
 
-    # .md → frontmatter에서 title/tags 직접 파싱
+    # [수집] .md 파일
     for path in md_files:
         with open(path, 'r', encoding='utf-8') as f:
             raw = f.read()
         meta, body = parse_frontmatter(raw)
-        fname = os.path.splitext(os.path.basename(path))[0]
-        title = meta.get('title', fname)
+        title = meta.get('title', os.path.splitext(os.path.basename(path))[0])
         tags  = meta.get('tags', '')
         all_titles[title] = (body, tags, 'text/markdown')
 
-    # .html → 파일명이 title, 상위 폴더명이 tags
+    # [수집] .html 파일 (iframe 방식 + 태그 체크)
     for path in html_src:
         title    = os.path.splitext(os.path.basename(path))[0]
         rel      = os.path.relpath(path, docs_folder).replace('\\', '/')
-        folders  = [f for f in rel.split('/')[:-1] if f and f not in ROOT_FOLDERS]
-        tags     = ' '.join(folders)
         
-        # iframe으로 감싸서 삽입 (HTML 페이지 자체 렌더링 유지)
+        # 상위 폴더 구조로 태그 리스트 생성
+        tag_list = [f for f in rel.split('/')[:-1] if f and f not in ROOT_FOLDERS]
+        
+        # ⭐ if 문 사용: 'html' 태그가 리스트에 없으면 추가
+        if 'html' not in tag_list:
+            tag_list.append('html')
+        
+        tags = ' '.join(tag_list)
         rel_path = os.path.relpath(path, '.').replace('\\', '/')
         body     = f'<iframe src="./{rel_path}" style="width:100%; height:80vh; border:none;" allowfullscreen></iframe>'
         
-        # 타입은 이전 요청사항대로 text/markdown으로 지정합니다.
         all_titles[title] = (body, tags, 'text/markdown')
 
-    # ── html 기존 티들러 수집 (내보내기용) ──
+    # [내보내기 준비] 기존 위키 티들러
     html_titles = {}
     for t in tiddlers:
-        # 이전 버전과의 호환성을 위해 text/html이 남아있더라도 수집은 해줍니다.
-        if t.get('type') in ('text/markdown', 'text/html') \
-                and not t.get('title', '').startswith('$:/'):
-            tags = t.get('tags', '')
-            if isinstance(tags, list):
-                tags = ' '.join(tags)
-            html_titles[t['title']] = {
-                'text': t.get('text', ''),
-                'tags': tags,
-                'type': t.get('type', 'text/markdown')
-            }
+        if not t.get('title', '').startswith('$:/'):
+            ts = t.get('tags', '')
+            ts_str = ' '.join(ts) if isinstance(ts, list) else str(ts)
+            html_titles[t['title']] = {'text': t.get('text', ''), 'tags': ts_str}
 
-    print(f"── {html_file} ({docs_folder}) ──")
-    print(f"  기존 티들러: {len(html_titles)}개")
-    print(f"  .md/html 파일(입력): {len(all_titles)}개")
-
+    print(f"── {html_file} ──")
     count = {'추가': 0, '수정': 0}
 
-    # docs → html (upsert)
+    # 위키 업데이트 (Upsert)
     for title, (body, tags, ttype) in all_titles.items():
         result_json, action = upsert(result_json, title, body, tags, now_tw(), ttype)
         count[action] += 1
-        tag_str = f"[{tags}] " if tags else ""
-        print(f"  {action}: {tag_str}{title}")
+        print(f"  {action}: [{tags}] {title}")
 
-    # html → docs (없는 티들러 → .md 파일로 내보내기)
+    # 로컬로 내보내기 (Export)
     for title, data in html_titles.items():
         if title not in all_titles:
-            tags = data['tags']
-            
-            # 💡 핵심 로직: 태그에 'html'이라는 단어가 포함되어 있다면 내보내지 않고 건너뜁니다.
-            if 'html' in tags.split():
+            # ⭐ 태그에 'html'이 포함된 경우 내보내지 않음
+            if 'html' in data['tags'].split():
                 continue
                 
             safe_name = re.sub(r'[\\/*?:"<>|]', '_', title)
             out_path  = os.path.join(docs_folder, f"{safe_name}.md")
-            content   = f"---\ntitle: \"{title}\"\ntags: \"{tags}\"\n---\n{data['text']}"
-                
+            content   = f"---\ntitle: \"{title}\"\ntags: \"{data['tags']}\"\n---\n{data['text']}"
             with open(out_path, 'w', encoding='utf-8') as f:
                 f.write(content)
             total_export += 1
             print(f"  내보내기: {title} → {out_path}")
 
-    # 검증 후 저장
-    json.loads(result_json)
+    # 최종 저장
+    json.loads(result_json) # JSON 검증
     with open(html_file, 'w', encoding='utf-8') as f:
-        f.write(html[:si] + result_json + html[ep:])
+        f.write(html_content[:si] + result_json + html_content[ep:])
 
-    # 임시 폴더 정리
     for tmp_dir in tmp_prefix.keys():
         shutil.rmtree(tmp_dir, ignore_errors=True)
 
-    print(f"  → 추가 {count['추가']}개 / 수정 {count['수정']}개\n")
-    total_add += count['추가']
-    total_mod += count['수정']
+    total_add += count['추가']; total_mod += count['수정']
 
-print(f"✓ 완료! 추가 {total_add} / 수정 {total_mod} / 내보내기 {total_export}")
+print(f"\n✓ 완료! 추가 {total_add} / 수정 {total_mod} / 내보내기 {total_export}")
