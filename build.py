@@ -89,7 +89,6 @@ def upsert(json_str, title, text, tags, modified, tiddler_type='text/markdown'):
         return json_str[:last_bracket] + new_str + ']', '추가'
 
 
-
 def extract_zip(zip_path, docs_folder):
     """
     ZIP 파일 압축 해제 후 (임시폴더, zip위치태그) 반환
@@ -160,14 +159,10 @@ for html_file, docs_folder in FILES.items():
         tmp_prefix[tmp_dir] = prefix
 
     # ── 파일 수집 ──
-    # .md 파일 (docs 직접 + ZIP 안)
     md_files = sorted(glob.glob(os.path.join(docs_folder, '**/*.md'), recursive=True))
     for tmp_dir in tmp_prefix.keys():
         md_files += sorted(glob.glob(os.path.join(tmp_dir, '**/*.md'), recursive=True))
 
-    # .html 파일 — docs 직접 파일만 수집 (ZIP 안에는 html 넣지 않음)
-    # iframe으로 감싸서 삽입 → JS/CSS 기능 작동, JSON 깨짐 방지
-    # 같은 title이면 .html이 .md 무조건 덮어씀
     html_src = sorted(glob.glob(os.path.join(docs_folder, '**/*.html'), recursive=True))
 
     # ── html 파일 읽기 ──
@@ -179,29 +174,34 @@ for html_file, docs_folder in FILES.items():
     # ── 수집: { title: (body, tags, type) } ──
     all_titles = {}
 
-    # .md → frontmatter에서 title/tags 직접 파싱 (폴더 경로 무관)
+    # .md → frontmatter에서 title/tags 직접 파싱
     for path in md_files:
         with open(path, 'r', encoding='utf-8') as f:
             raw = f.read()
         meta, body = parse_frontmatter(raw)
         fname = os.path.splitext(os.path.basename(path))[0]
         title = meta.get('title', fname)
-        tags  = meta.get('tags', '')  # frontmatter 그대로, 없으면 빈값
+        tags  = meta.get('tags', '')
         all_titles[title] = (body, tags, 'text/markdown')
 
-    # .html → 파일명이 title, 상위 폴더명이 tags (docs 기준 자동 추출)
+    # .html → 파일명이 title, 상위 폴더명이 tags
     for path in html_src:
         title    = os.path.splitext(os.path.basename(path))[0]
         rel      = os.path.relpath(path, docs_folder).replace('\\', '/')
         folders  = [f for f in rel.split('/')[:-1] if f and f not in ROOT_FOLDERS]
         tags     = ' '.join(folders)
+        
+        # iframe으로 감싸서 삽입 (HTML 페이지 자체 렌더링 유지)
         rel_path = os.path.relpath(path, '.').replace('\\', '/')
         body     = f'<iframe src="./{rel_path}" style="width:100%; height:80vh; border:none;" allowfullscreen></iframe>'
-        all_titles[title] = (body, tags, 'text/html')
+        
+        # 타입은 이전 요청사항대로 text/markdown으로 지정합니다.
+        all_titles[title] = (body, tags, 'text/markdown')
 
     # ── html 기존 티들러 수집 (내보내기용) ──
     html_titles = {}
     for t in tiddlers:
+        # 이전 버전과의 호환성을 위해 text/html이 남아있더라도 수집은 해줍니다.
         if t.get('type') in ('text/markdown', 'text/html') \
                 and not t.get('title', '').startswith('$:/'):
             tags = t.get('tags', '')
@@ -215,8 +215,7 @@ for html_file, docs_folder in FILES.items():
 
     print(f"── {html_file} ({docs_folder}) ──")
     print(f"  기존 티들러: {len(html_titles)}개")
-    print(f"  .md 파일:   {len([v for v in all_titles.values() if v[2]=='text/markdown'])}개")
-    print(f"  .html 파일: {len([v for v in all_titles.values() if v[2]=='text/html'])}개")
+    print(f"  .md/html 파일(입력): {len(all_titles)}개")
 
     count = {'추가': 0, '수정': 0}
 
@@ -225,15 +224,21 @@ for html_file, docs_folder in FILES.items():
         result_json, action = upsert(result_json, title, body, tags, now_tw(), ttype)
         count[action] += 1
         tag_str = f"[{tags}] " if tags else ""
-        ext = '.html' if ttype == 'text/html' else '.md'
-        print(f"  {action}({ext}): {tag_str}{title}")
+        print(f"  {action}: {tag_str}{title}")
 
     # html → docs (없는 티들러 → .md 파일로 내보내기)
     for title, data in html_titles.items():
         if title not in all_titles:
+            tags = data['tags']
+            
+            # 💡 핵심 로직: 태그에 'html'이라는 단어가 포함되어 있다면 내보내지 않고 건너뜁니다.
+            if 'html' in tags.split():
+                continue
+                
             safe_name = re.sub(r'[\\/*?:"<>|]', '_', title)
             out_path  = os.path.join(docs_folder, f"{safe_name}.md")
-            content   = f"---\ntitle: \"{title}\"\ntags: \"{data['tags']}\"\n---\n{data['text']}"
+            content   = f"---\ntitle: \"{title}\"\ntags: \"{tags}\"\n---\n{data['text']}"
+                
             with open(out_path, 'w', encoding='utf-8') as f:
                 f.write(content)
             total_export += 1
@@ -253,4 +258,3 @@ for html_file, docs_folder in FILES.items():
     total_mod += count['수정']
 
 print(f"✓ 완료! 추가 {total_add} / 수정 {total_mod} / 내보내기 {total_export}")
-
