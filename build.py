@@ -171,7 +171,11 @@ for html_file, docs_folder in FILES.items():
             # 일반 파일: docs 기준 폴더 태그
             zip_extra = get_folder_tags(path, docs_folder)
 
-        final_tags = " ".join(sorted(set(tags_in_file + zip_extra)))
+        # 폴더 태그는 순서 유지 (계층 구조 보존)
+        # frontmatter 태그는 중복 제거 후 뒤에 추가
+        seen = set(zip_extra)
+        extra_fm = [t for t in tags_in_file if t not in seen]
+        final_tags = " ".join(zip_extra + extra_fm)
         all_titles[title] = (body, final_tags, 'text/markdown')
 
     # 위키 내 기존 데이터 수집 (내보내기용)
@@ -194,58 +198,39 @@ for html_file, docs_folder in FILES.items():
         print(f"  {action}: [{tags}] {title}")
 
     # [내보내기] 위키 전용 티들러 → 로컬 MD
-    # 전체 내보내기 목록의 공통 접두사를 분석해서 폴더 구조 결정
-    #
-    # 예시 A: [대한민국, 부산, 해운대], [대한민국, 부산, 영도]
-    #   → 공통 접두사 [대한민국, 부산] (2개) → 하이픈 → 대한민국-부산/해운대, 대한민국-부산/영도
-    #
-    # 예시 B: [대한민국, 부산], [대한민국, 서울]
-    #   → 공통 접두사 [대한민국] (1개) → 일반 폴더 → 대한민국/부산, 대한민국/서울
+    # 태그 빈도수로 부모/자식 자동 결정 → 빈도 높은 태그가 상위 폴더
+    # ex) 일본(빈도 높음) + 교토(빈도 낮음) → 일본/교토
+    # 공통 접두사 2개 이상이면 하이픈, 1개면 일반 폴더
 
     def assign_export_paths(items, current=""):
-        """
-        items: [(title, remaining_tags)]
-        전체 목록의 공통 접두사를 찾아 폴더 구조 결정
-        공통 접두사 2개 이상 → 하이픈, 1개 → 일반 폴더
-        """
         if not items: return {}
         result = {}
-
-        # 태그 없는 항목 → 현재 폴더에 배치
         for title, tags in items:
             if not tags: result[title] = current
-
         with_tags = [(t, tags) for t, tags in items if tags]
         if not with_tags: return result
 
-        # 전체의 공통 접두사 탐색
         min_len = min(len(tags) for _, tags in with_tags)
         common = []
         for i in range(min_len):
             vals = [tags[i] for _, tags in with_tags]
-            if len(set(vals)) == 1:
-                common.append(vals[0])
-            else:
-                break
+            if len(set(vals)) == 1: common.append(vals[0])
+            else: break
 
         if common:
-            # 공통 접두사 존재 → 1개면 일반 폴더, 2개 이상이면 하이픈
             folder   = '-'.join(common) if len(common) >= 2 else common[0]
             new_path = os.path.join(current, folder) if current else folder
             remaining = [(t, tags[len(common):]) for t, tags in with_tags]
             result.update(assign_export_paths(remaining, new_path))
         else:
-            # 공통 접두사 없음 → 첫 번째 태그로 그룹핑 후 재귀
             groups = {}
             for title, tags in with_tags:
                 key = tags[0]
                 if key not in groups: groups[key] = []
                 groups[key].append((title, tags[1:]))
-
             for key, group in groups.items():
                 new_path = os.path.join(current, key) if current else key
                 result.update(assign_export_paths(group, new_path))
-
         return result
 
     # 내보낼 항목 수집
@@ -255,11 +240,23 @@ for html_file, docs_folder in FILES.items():
             tag_list = data['tags'].split()
             export_items.append((title, tag_list, data['text']))
 
+    # ── 태그 빈도수로 순서 정렬 ──────────────────────────────────
+    # 전체 항목에서 각 태그 등장 횟수 계산
+    from collections import Counter
+    tag_freq = Counter(t for _, tags, _ in export_items for t in tags)
+
+    # 각 항목의 태그를 빈도 내림차순 정렬 → 빈도 높은 태그가 상위 폴더
+    # 빈도 같으면 원래 순서 유지
+    sorted_export_items = []
+    for title, tag_list, body in export_items:
+        sorted_tags = sorted(tag_list, key=lambda t: -tag_freq[t])
+        sorted_export_items.append((title, sorted_tags, body))
+
     # 전체 목록 기반으로 경로 계산
-    path_map = assign_export_paths([(t, tags) for t, tags, _ in export_items])
+    path_map = assign_export_paths([(t, tags) for t, tags, _ in sorted_export_items])
 
     # 파일 쓰기
-    export_texts = {t: body for t, _, body in export_items}
+    export_texts = {t: body for t, _, body in sorted_export_items}
     for title, subfolder in path_map.items():
         target_dir = os.path.join(docs_folder, subfolder)
         os.makedirs(target_dir, exist_ok=True)
