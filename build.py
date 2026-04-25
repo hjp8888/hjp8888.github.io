@@ -194,22 +194,81 @@ for html_file, docs_folder in FILES.items():
         print(f"  {action}: [{tags}] {title}")
 
     # [내보내기] 위키 전용 티들러 → 로컬 MD
-    # 태그 전체를 하이픈으로 연결한 폴더명 하나로 저장
-    # ex) tags: "여행 부산" → docs/여행-부산/파일.md
+    # 전체 내보내기 목록의 공통 접두사를 분석해서 폴더 구조 결정
+    #
+    # 예시 A: [대한민국, 부산, 해운대], [대한민국, 부산, 영도]
+    #   → 공통 접두사 [대한민국, 부산] (2개) → 하이픈 → 대한민국-부산/해운대, 대한민국-부산/영도
+    #
+    # 예시 B: [대한민국, 부산], [대한민국, 서울]
+    #   → 공통 접두사 [대한민국] (1개) → 일반 폴더 → 대한민국/부산, 대한민국/서울
+
+    def assign_export_paths(items, current=""):
+        """
+        items: [(title, remaining_tags)]
+        전체 목록의 공통 접두사를 찾아 폴더 구조 결정
+        공통 접두사 2개 이상 → 하이픈, 1개 → 일반 폴더
+        """
+        if not items: return {}
+        result = {}
+
+        # 태그 없는 항목 → 현재 폴더에 배치
+        for title, tags in items:
+            if not tags: result[title] = current
+
+        with_tags = [(t, tags) for t, tags in items if tags]
+        if not with_tags: return result
+
+        # 전체의 공통 접두사 탐색
+        min_len = min(len(tags) for _, tags in with_tags)
+        common = []
+        for i in range(min_len):
+            vals = [tags[i] for _, tags in with_tags]
+            if len(set(vals)) == 1:
+                common.append(vals[0])
+            else:
+                break
+
+        if common:
+            # 공통 접두사 존재 → 1개면 일반 폴더, 2개 이상이면 하이픈
+            folder   = '-'.join(common) if len(common) >= 2 else common[0]
+            new_path = os.path.join(current, folder) if current else folder
+            remaining = [(t, tags[len(common):]) for t, tags in with_tags]
+            result.update(assign_export_paths(remaining, new_path))
+        else:
+            # 공통 접두사 없음 → 첫 번째 태그로 그룹핑 후 재귀
+            groups = {}
+            for title, tags in with_tags:
+                key = tags[0]
+                if key not in groups: groups[key] = []
+                groups[key].append((title, tags[1:]))
+
+            for key, group in groups.items():
+                new_path = os.path.join(current, key) if current else key
+                result.update(assign_export_paths(group, new_path))
+
+        return result
+
+    # 내보낼 항목 수집
+    export_items = []
     for title, data in wiki_data.items():
         if title not in all_titles:
             tag_list = data['tags'].split()
-            # 태그 전체를 하이픈으로 연결 → 폴더명 하나
-            subfolder = '-'.join(tag_list) if tag_list else ""
-            target_dir = os.path.join(docs_folder, subfolder)
-            os.makedirs(target_dir, exist_ok=True)
-            # 폴더명으로 태그를 표현하므로 frontmatter tags는 비움
-            safe_name = re.sub(r'[\\/*?:"<>|]', '_', title)
-            out_path = os.path.join(target_dir, f"{safe_name}.md")
-            content = f"---\ntitle: \"{title}\"\ntags: \"\"\n---\n{data['text']}"
-            with open(out_path, 'w', encoding='utf-8') as f: f.write(content)
-            total_export += 1
-            print(f"  내보내기: {title} → {os.path.relpath(out_path, docs_folder)}")
+            export_items.append((title, tag_list, data['text']))
+
+    # 전체 목록 기반으로 경로 계산
+    path_map = assign_export_paths([(t, tags) for t, tags, _ in export_items])
+
+    # 파일 쓰기
+    export_texts = {t: body for t, _, body in export_items}
+    for title, subfolder in path_map.items():
+        target_dir = os.path.join(docs_folder, subfolder)
+        os.makedirs(target_dir, exist_ok=True)
+        safe_name = re.sub(r'[\\/*?:"<>|]', '_', title)
+        out_path  = os.path.join(target_dir, f"{safe_name}.md")
+        content   = f"---\ntitle: \"{title}\"\ntags: \"\"\n---\n{export_texts[title]}"
+        with open(out_path, 'w', encoding='utf-8') as f: f.write(content)
+        total_export += 1
+        print(f"  내보내기: {title} → {os.path.relpath(out_path, docs_folder)}")
 
     # 최종 저장 및 검증
     json.loads(result_json)
@@ -222,3 +281,4 @@ for html_file, docs_folder in FILES.items():
     total_add += count['추가']; total_mod += count['수정']
 
 print(f"\n✓ 완료! 추가 {total_add} / 수정 {total_mod} / 내보내기 {total_export}")
+
