@@ -85,39 +85,6 @@ python watch.py
 
 ---
 
-## 🤖 안드로이드 (Termux)
-
-안드로이드에서도 build.py를 직접 실행할 수 있어요.
-
-### 설치
-
-Play Store 말고 **F-Droid**에서 Termux를 설치해야 해요.
-
-```bash
-pkg install python git
-```
-
-### 사용법
-
-```bash
-# 레포 클론
-git clone https://github.com/hjp8888/hjp8888.github.io.git wiki
-cd wiki
-
-# md 파일 작성 후 빌드
-python build.py
-
-# 커밋 & 푸시
-git add .
-git commit -m "글 추가"
-git push
-```
-
-> GitHub Actions가 자동으로 빌드하므로 안드로이드에서는 git push만 해도 돼요.
-> build.py 직접 실행은 푸시 없이 로컬에서 확인할 때만 필요해요.
-
----
-
 ## 🐧 리눅스 서버 운영 (nginx)
 
 ```bash
