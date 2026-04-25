@@ -36,3 +36,4 @@ LAST UPDATE: 2026.04
 - [티들리위키 사용법](#사용법)
 - [Test.html](#test)
 - [📚README](#README)
+- [📚README2](#README2)
